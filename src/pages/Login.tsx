@@ -27,7 +27,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+    <div className="min-h-screen w-screen bg-slate-100 flex items-center justify-center">
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 w-full max-w-sm overflow-hidden">
         {/* Cabecera con logo */}
         <div className="bg-slate-900 px-8 py-8 flex flex-col items-center">
