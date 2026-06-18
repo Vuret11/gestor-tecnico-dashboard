@@ -3,7 +3,7 @@ import { X, Bell, MapPin, Calendar } from 'lucide-react';
 import { useNotifications, type VisitaNotificacion } from '../context/NotificationsContext';
 
 function Toast({ notif, onDismiss }: { notif: VisitaNotificacion; onDismiss: () => void }) {
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     timerRef.current = setTimeout(onDismiss, 6000);

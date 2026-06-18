@@ -23,7 +23,6 @@ const AMBER_50   = '#fffbeb';
 const BLUE_700   = '#1d4ed8';
 const BLUE_50    = '#eff6ff';
 const GREEN_600  = '#16a34a';
-const GREEN_50   = '#f0fdf4';
 
 const TIPO_LABELS: Record<TipoVisita, string> = {
   visita_tecnica_fv: 'Visita Técnica Fotovoltaica',

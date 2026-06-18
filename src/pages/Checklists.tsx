@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { checklists as api } from '../api/endpoints';
-import type { ChecklistPlantilla, ChecklistSeccion, ChecklistItem, ItemTipo } from '../types';
+import type { ChecklistPlantilla, ItemTipo } from '../types';
 import { Plus, Trash2, ChevronDown, ChevronRight, ClipboardList, X, GripVertical } from 'lucide-react';
 
 const TIPO_LABEL: Record<ItemTipo, string> = {
@@ -243,8 +243,8 @@ function PlantillaDetalle({ plantilla }: { plantilla: ChecklistPlantilla }) {
                   {item.obligatorio && (
                     <span className="text-xs text-red-500 font-medium">*</span>
                   )}
-                  {item.opciones?.length > 0 && (
-                    <span className="text-xs text-slate-400 truncate max-w-32">{item.opciones.join(', ')}</span>
+                  {(item.opciones?.length ?? 0) > 0 && (
+                    <span className="text-xs text-slate-400 truncate max-w-32">{item.opciones?.join(', ')}</span>
                   )}
                 </div>
               ))}
