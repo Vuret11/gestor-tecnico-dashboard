@@ -16,7 +16,7 @@ function Toast({ notif, onDismiss }: { notif: VisitaNotificacion; onDismiss: () 
   });
 
   return (
-    <div className="w-80 rounded-xl shadow-2xl overflow-hidden animate-slide-in">
+    <div className="w-full sm:w-80 rounded-t-xl sm:rounded-xl shadow-2xl overflow-hidden animate-slide-in">
       {/* Cabecera roja */}
       <div className="bg-brand px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-white">
@@ -64,7 +64,9 @@ export default function NotificationToasts() {
   if (!notificaciones.length) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-3 items-end">
+    <div className="fixed z-[9999] flex flex-col gap-0
+                    bottom-0 left-0 right-0
+                    sm:bottom-5 sm:left-auto sm:right-5 sm:w-80 sm:gap-3">
       {notificaciones.map(n => (
         <Toast key={n.visitaId} notif={n} onDismiss={() => dismiss(n.visitaId)} />
       ))}
