@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Instalacion, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist } from '../types';
+import type { AuthResponse, User, Instalacion, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto } from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -39,6 +39,10 @@ export const visitas = {
 export const informes = {
   list: () => api.get<Informe[]>('/informes').then(r => r.data),
   get: (id: string) => api.get<Informe>(`/informes/${id}`).then(r => r.data),
+};
+
+export const fotos = {
+  porVisita: (visitaId: string) => api.get<Foto[]>(`/fotos/visita/${visitaId}`).then(r => r.data),
 };
 
 export const checklists = {

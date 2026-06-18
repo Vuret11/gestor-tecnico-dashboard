@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { informes as api } from '../api/endpoints';
-import type { Informe, TipoVisita } from '../types';
+import { informes as api, fotos as fotosApi, checklists as checklistsApi } from '../api/endpoints';
+import type { Informe, TipoVisita, Foto, VisitaChecklist } from '../types';
 import {
   FileText, X, Printer, MapPin, User, Calendar,
-  Clock, Wrench, Package, CheckCircle2, Zap,
+  Clock, Wrench, Package, CheckCircle2, Zap, Camera, ClipboardList,
 } from 'lucide-react';
 import { InformePDFButton } from '../components/InformePDF';
 
@@ -16,10 +16,30 @@ const TIPO_LABELS: Record<TipoVisita, string> = {
 };
 
 // ─── Vista de documento ───────────────────────────────────────────────────────
+const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') ?? 'http://localhost:3000';
+
+function fotoSrc(url: string) {
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  return `${API_BASE}${url}`;
+}
+
 function InformeDocumento({ inf, onClose }: { inf: Informe; onClose: () => void }) {
   const visita = inf.visita;
   const tipo = visita?.tipo as TipoVisita | undefined;
   const esInstalacion = tipo?.startsWith('instalacion_nueva');
+
+  const { data: fotos = [] } = useQuery<Foto[]>({
+    queryKey: ['fotos-visita', inf.visita_id],
+    queryFn: () => fotosApi.porVisita(inf.visita_id),
+    enabled: !!inf.visita_id,
+  });
+
+  const { data: checklist } = useQuery<VisitaChecklist>({
+    queryKey: ['checklist-visita', inf.visita_id],
+    queryFn: () => checklistsApi.porVisita(inf.visita_id),
+    enabled: !!inf.visita_id,
+    retry: false,
+  });
 
   const handlePrint = () => window.print();
 
@@ -150,6 +170,106 @@ function InformeDocumento({ inf, onClose }: { inf: Informe; onClose: () => void 
           {visita?.notas && (
             <Section icon={<FileText size={14} />} title="Notas adicionales">
               <p className="text-slate-600 leading-relaxed italic">{visita.notas}</p>
+            </Section>
+          )}
+
+          {/* Fechas reales */}
+          {(visita?.fechaInicio || visita?.fechaFin) && (
+            <div className="flex gap-4 mb-6">
+              {visita.fechaInicio && (
+                <div className="flex-1 bg-slate-50 rounded-xl p-4">
+                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Clock size={11} /> Inicio real
+                  </p>
+                  <p className="font-semibold text-slate-900 text-sm">
+                    {new Date(visita.fechaInicio).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              )}
+              {visita.fechaFin && (
+                <div className="flex-1 bg-slate-50 rounded-xl p-4">
+                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Clock size={11} /> Fin real
+                  </p>
+                  <p className="font-semibold text-slate-900 text-sm">
+                    {new Date(visita.fechaFin).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              )}
+              {visita.fechaInicio && visita.fechaFin && (
+                <div className="flex-1 bg-slate-50 rounded-xl p-4">
+                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Clock size={11} /> Duración
+                  </p>
+                  <p className="font-semibold text-slate-900 text-sm">
+                    {(() => {
+                      const mins = Math.round((new Date(visita.fechaFin).getTime() - new Date(visita.fechaInicio).getTime()) / 60000);
+                      return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}min` : `${mins} min`;
+                    })()}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Checklist */}
+          {checklist?.id && checklist.plantilla && (
+            <Section icon={<ClipboardList size={14} />} title={`Checklist: ${checklist.plantilla.nombre}`}>
+              <div className="space-y-4">
+                {[...checklist.plantilla.secciones]
+                  .sort((a, b) => a.orden - b.orden)
+                  .map(sec => (
+                    <div key={sec.id}>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 pb-1 border-b border-slate-100">
+                        {sec.titulo}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[...sec.items].sort((a, b) => a.orden - b.orden).map(item => {
+                          const resp = checklist.respuestas?.find(r => r.itemId === item.id);
+                          const valor = resp?.valor ?? '—';
+                          return (
+                            <div key={item.id} className="flex flex-col gap-0.5">
+                              <span className="text-xs text-slate-400">{item.etiqueta}</span>
+                              <span className="text-sm font-medium text-slate-800">
+                                {item.tipo === 'boolean'
+                                  ? (valor === 'true' ? '✓ Sí' : '✗ No')
+                                  : `${valor}${item.unidad ? ` ${item.unidad}` : ''}`}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                {checklist.completadoEn && (
+                  <p className="text-xs text-slate-400 pt-2 border-t border-slate-100">
+                    Completado el {new Date(checklist.completadoEn).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {checklist.firmante ? ` · Firmado por ${checklist.firmante}` : ''}
+                  </p>
+                )}
+              </div>
+            </Section>
+          )}
+
+          {/* Fotografías */}
+          {fotos.length > 0 && (
+            <Section icon={<Camera size={14} />} title={`Fotografías (${fotos.length})`}>
+              <div className="grid grid-cols-3 gap-2">
+                {fotos.map(foto => (
+                  <div key={foto.id} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100">
+                    <img
+                      src={fotoSrc(foto.url)}
+                      alt="Foto visita"
+                      className="w-full h-full object-cover"
+                    />
+                    {(foto.latitud || foto.descripcion) && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1.5 py-0.5 truncate">
+                        {foto.descripcion || (foto.latitud ? `${foto.latitud?.toFixed(4)}, ${foto.longitud?.toFixed(4)}` : '')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </Section>
           )}
 

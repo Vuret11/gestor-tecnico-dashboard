@@ -43,6 +43,18 @@ export interface Visita {
   estado: EstadoVisita;
   notas?: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface Foto {
+  id: string;
+  visita_id: string;
+  url: string;
+  thumbnail?: string;
+  latitud?: number;
+  longitud?: number;
+  descripcion?: string;
+  createdAt: string;
 }
 
 export interface Informe {
