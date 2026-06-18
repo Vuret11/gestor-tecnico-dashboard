@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Users, CalendarCheck,
-  FileText, AlertTriangle, LogOut, ClipboardList, Map, Calendar,
+  FileText, AlertTriangle, LogOut, ClipboardList, Calendar,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
@@ -15,7 +15,6 @@ const nav = [
   { to: '/informes', icon: FileText, label: 'Informes' },
   { to: '/incidencias', icon: AlertTriangle, label: 'Incidencias' },
   { to: '/checklists', icon: ClipboardList, label: 'Checklists' },
-  { to: '/mapa', icon: Map, label: 'Mapa' },
 ];
 
 export default function Sidebar() {
