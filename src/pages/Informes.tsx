@@ -59,7 +59,7 @@ function InformeDocumento({ inf, onClose }: { inf: Informe; onClose: () => void 
             >
               <Printer size={14} /> Imprimir
             </button>
-            <InformePDFButton inf={inf} />
+            <InformePDFButton inf={inf} fotos={fotos} checklist={checklist} />
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
               <X size={18} />
             </button>
