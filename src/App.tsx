@@ -12,6 +12,7 @@ import Informes from './pages/Informes';
 import Incidencias from './pages/Incidencias';
 import Checklists from './pages/Checklists';
 import Calendario from './pages/Calendario';
+import Clientes from './pages/Clientes';
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/clientes" element={<Clientes />} />
               <Route path="/instalaciones" element={<Instalaciones />} />
               <Route path="/tecnicos" element={<Tecnicos />} />
               <Route path="/visitas" element={<Visitas />} />

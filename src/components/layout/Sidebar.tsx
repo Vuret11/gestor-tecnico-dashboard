@@ -1,13 +1,14 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Users, CalendarCheck,
-  FileText, AlertTriangle, LogOut, ClipboardList, Calendar,
+  FileText, AlertTriangle, LogOut, ClipboardList, Calendar, UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
 
 const nav = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/clientes', icon: UserCheck, label: 'Clientes' },
   { to: '/instalaciones', icon: Building2, label: 'Instalaciones' },
   { to: '/tecnicos', icon: Users, label: 'Técnicos' },
   { to: '/calendario', icon: Calendar, label: 'Calendario' },

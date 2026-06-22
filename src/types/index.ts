@@ -4,6 +4,18 @@ export type TipoVisita = 'visita_tecnica_fv' | 'visita_tecnica_aerotermia' | 'in
 export type Prioridad = 'baja' | 'media' | 'alta' | 'critica';
 export type EstadoIncidencia = 'abierta' | 'en_progreso' | 'resuelta' | 'cerrada';
 
+export interface Cliente {
+  id: string;
+  nombre: string;
+  nif?: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+  notas?: string;
+  activo: boolean;
+  createdAt: string;
+}
+
 export interface User {
   id: string;
   nombre: string;
@@ -18,6 +30,7 @@ export interface Instalacion {
   id: string;
   nombre: string;
   cliente: string;
+  clienteId?: string;
   direccion: string;
   ciudad: string;
   provincia?: string;

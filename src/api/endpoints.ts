@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Instalacion, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto } from '../types';
+import type { AuthResponse, User, Cliente, Instalacion, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto } from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -14,8 +14,20 @@ export const users = {
     api.patch<User>(`/usuarios/${id}`, data).then(r => r.data),
 };
 
+export const clientes = {
+  list: () => api.get<Cliente[]>('/clientes').then(r => r.data),
+  get: (id: string) => api.get<Cliente>(`/clientes/${id}`).then(r => r.data),
+  create: (data: Partial<Cliente>) =>
+    api.post<Cliente>('/clientes', data).then(r => r.data),
+  update: (id: string, data: Partial<Cliente>) =>
+    api.patch<Cliente>(`/clientes/${id}`, data).then(r => r.data),
+  remove: (id: string) => api.delete(`/clientes/${id}`),
+};
+
 export const instalaciones = {
   list: () => api.get<Instalacion[]>('/instalaciones').then(r => r.data),
+  byCliente: (clienteId: string) =>
+    api.get<Instalacion[]>(`/instalaciones/by-cliente/${clienteId}`).then(r => r.data),
   get: (id: string) => api.get<Instalacion>(`/instalaciones/${id}`).then(r => r.data),
   create: (data: Partial<Instalacion>) =>
     api.post<Instalacion>('/instalaciones', data).then(r => r.data),
