@@ -70,6 +70,13 @@ function ClienteModal({ item, onClose }: { item?: Cliente; onClose: () => void }
             />
           </div>
         </div>
+        {save.isError && (
+          <div className="mx-6 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            {(save.error as any)?.response?.data?.message
+              ?? (save.error as any)?.message
+              ?? 'Error al guardar'}
+          </div>
+        )}
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">
             Cancelar
