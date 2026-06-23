@@ -63,6 +63,8 @@ export interface Foto {
   id: string;
   visita_id: string;
   url: string;
+  nombre?: string;
+  tipo: 'foto' | 'documento';
   thumbnail?: string;
   latitud?: number;
   longitud?: number;

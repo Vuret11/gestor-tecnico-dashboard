@@ -55,6 +55,14 @@ export const informes = {
 
 export const fotos = {
   porVisita: (visitaId: string) => api.get<Foto[]>(`/fotos/visita/${visitaId}`).then(r => r.data),
+  upload: (visitaId: string, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('visita_id', visitaId);
+    fd.append('nombre', file.name);
+    fd.append('tipo', file.type.startsWith('image/') ? 'foto' : 'documento');
+    return api.post<Foto>('/fotos', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+  },
 };
 
 export const checklists = {

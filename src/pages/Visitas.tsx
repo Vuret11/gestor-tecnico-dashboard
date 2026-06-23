@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { visitas as api, instalaciones as instApi, users as usersApi } from '../api/endpoints';
-import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
+import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi } from '../api/endpoints';
+import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2 } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import type { TipoVisita, EstadoVisita, Visita } from '../types';
 
@@ -51,15 +51,42 @@ function Modal({ onClose }: { onClose: () => void }) {
     notas: '',
   });
   const [busqInst, setBusqInst] = useState('');
+  const [adjuntos, setAdjuntos] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const instsFiltradas = insts.filter(i =>
     i.nombre.toLowerCase().includes(busqInst.toLowerCase()) ||
     i.cliente.toLowerCase().includes(busqInst.toLowerCase())
   );
 
+  const addFiles = (files: FileList | null) => {
+    if (!files) return;
+    setAdjuntos(prev => [
+      ...prev,
+      ...Array.from(files).filter(f =>
+        !prev.some(p => p.name === f.name && p.size === f.size)
+      ),
+    ]);
+  };
+
   const save = useMutation({
     mutationFn: () => api.create(form as any),
-    onSuccess: () => {
+    onSuccess: async (visita) => {
+      if (adjuntos.length > 0) {
+        setUploading(true);
+        try {
+          await Promise.all(adjuntos.map(f => fotosApi.upload(visita.id, f)));
+        } catch {
+          setUploadError('Visita creada, pero algún adjunto no se subió correctamente.');
+          setUploading(false);
+          qc.invalidateQueries({ queryKey: ['visitas'] });
+          qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
+          return;
+        }
+        setUploading(false);
+      }
       qc.invalidateQueries({ queryKey: ['visitas'] });
       qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
       onClose();
@@ -70,6 +97,7 @@ function Modal({ onClose }: { onClose: () => void }) {
     setForm(f => ({ ...f, [k]: e.target.value }));
 
   const instSel = insts.find(i => i.id === form.instalacion_id);
+  const busy = save.isPending || uploading;
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -78,7 +106,7 @@ function Modal({ onClose }: { onClose: () => void }) {
           <h2 className="font-semibold text-slate-900">Programar visita</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
-        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="p-6 space-y-4 max-h-[72vh] overflow-y-auto">
           {/* Tipo */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de visita</label>
@@ -97,17 +125,14 @@ function Modal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {/* Instalación con buscador */}
+          {/* Instalación */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Instalación</label>
             <div className="relative mb-1">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={busqInst}
-                onChange={e => setBusqInst(e.target.value)}
+              <input value={busqInst} onChange={e => setBusqInst(e.target.value)}
                 placeholder="Buscar instalación o cliente..."
-                className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-              />
+                className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
             </div>
             <select value={form.instalacion_id} onChange={set('instalacion_id')} size={4}
               className="w-full border border-slate-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
@@ -116,9 +141,7 @@ function Modal({ onClose }: { onClose: () => void }) {
                 <option key={i.id} value={i.id}>{i.nombre} · {i.cliente}</option>
               ))}
             </select>
-            {instSel && (
-              <p className="text-xs text-brand mt-1">✓ {instSel.nombre} — {instSel.ciudad}</p>
-            )}
+            {instSel && <p className="text-xs text-brand mt-1">✓ {instSel.nombre} — {instSel.ciudad}</p>}
           </div>
 
           {/* Técnico */}
@@ -144,13 +167,65 @@ function Modal({ onClose }: { onClose: () => void }) {
             <textarea value={form.notas} onChange={set('notas')} rows={2}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
+
+          {/* Adjuntos */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Documentación adjunta <span className="font-normal text-slate-400">(fotos, PDFs)</span>
+            </label>
+            <div
+              className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-brand/40 hover:bg-slate-50 transition-colors"
+              onClick={() => fileRef.current?.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
+            >
+              <Paperclip size={18} className="mx-auto text-slate-300 mb-1" />
+              <p className="text-xs text-slate-400">Arrastra aquí o <span className="text-brand">selecciona archivos</span></p>
+              <p className="text-[10px] text-slate-300 mt-0.5">Imágenes y PDFs</p>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,application/pdf"
+                className="hidden"
+                onChange={e => addFiles(e.target.files)}
+              />
+            </div>
+
+            {adjuntos.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {adjuntos.map((f, i) => (
+                  <li key={i} className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded-lg text-xs">
+                    {f.type.startsWith('image/') ? (
+                      <ImageIcon size={13} className="text-brand flex-shrink-0" />
+                    ) : (
+                      <FileText size={13} className="text-red-500 flex-shrink-0" />
+                    )}
+                    <span className="truncate flex-1 text-slate-700">{f.name}</span>
+                    <span className="text-slate-400 flex-shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                    <button onClick={() => setAdjuntos(a => a.filter((_, j) => j !== i))}
+                      className="text-slate-300 hover:text-red-500 flex-shrink-0">
+                      <Trash2 size={12} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
+
+        {uploadError && (
+          <div className="mx-6 mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+            {uploadError}
+          </div>
+        )}
+
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600">Cancelar</button>
           <button onClick={() => save.mutate()}
-            disabled={save.isPending || !form.instalacion_id || !form.tecnico_id || !form.fechaProgramada}
+            disabled={busy || !form.instalacion_id || !form.tecnico_id || !form.fechaProgramada}
             className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50">
-            {save.isPending ? 'Guardando...' : 'Programar'}
+            {uploading ? `Subiendo ${adjuntos.length} archivo${adjuntos.length > 1 ? 's' : ''}...` : save.isPending ? 'Guardando...' : 'Programar'}
           </button>
         </div>
       </div>
