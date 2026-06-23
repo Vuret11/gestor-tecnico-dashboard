@@ -233,6 +233,152 @@ function Modal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Panel lateral: detalle + adjuntos de una visita ─────────────────────────
+function VisitaPanel({ visita, onClose }: { visita: Visita; onClose: () => void }) {
+  const { data: adjuntos = [], isLoading, refetch } = useQuery({
+    queryKey: ['fotos-visita', visita.id],
+    queryFn: () => fotosApi.porVisita(visita.id),
+  });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    await Promise.allSettled(Array.from(files).map(f => fotosApi.upload(visita.id, f)));
+    await refetch();
+    setUploading(false);
+  };
+
+  const fotos = adjuntos.filter(a => a.tipo === 'foto');
+  const docs  = adjuntos.filter(a => a.tipo === 'documento');
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-[440px] bg-white shadow-2xl z-50 flex flex-col">
+
+        {/* Cabecera */}
+        <div className="px-5 py-4 border-b border-slate-200">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-900 truncate">{visita.instalacion?.nombre ?? '—'}</p>
+              <p className="text-xs text-slate-500">{visita.instalacion?.cliente} · {visita.instalacion?.ciudad}</p>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 flex-shrink-0">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <TipoBadge tipo={visita.tipo} />
+            <Badge value={visita.estado} />
+          </div>
+        </div>
+
+        {/* Detalles */}
+        <div className="px-5 py-3 border-b border-slate-100 grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <p className="text-slate-400 mb-0.5">Técnico</p>
+            <p className="font-medium text-slate-700">{visita.tecnico?.nombre ?? '—'}</p>
+          </div>
+          <div>
+            <p className="text-slate-400 mb-0.5">Fecha programada</p>
+            <p className="font-medium text-slate-700">
+              {new Date(visita.fechaProgramada).toLocaleString('es-ES', {
+                day: '2-digit', month: '2-digit', year: '2-digit',
+                hour: '2-digit', minute: '2-digit',
+              })}
+            </p>
+          </div>
+          {visita.notas && (
+            <div className="col-span-2">
+              <p className="text-slate-400 mb-0.5">Notas</p>
+              <p className="text-slate-700">{visita.notas}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Adjuntos */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Adjuntos {adjuntos.length > 0 && `(${adjuntos.length})`}
+            </p>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 text-xs bg-brand text-white px-3 py-1.5 rounded-lg hover:bg-brand-dark disabled:opacity-50"
+            >
+              <Paperclip size={12} />
+              {uploading ? 'Subiendo...' : 'Añadir'}
+            </button>
+            <input ref={fileRef} type="file" multiple accept="image/*,.pdf"
+              className="hidden" onChange={e => uploadFiles(e.target.files)} />
+          </div>
+
+          {isLoading ? (
+            <p className="text-sm text-slate-400">Cargando...</p>
+          ) : adjuntos.length === 0 ? (
+            <div className="text-center py-8">
+              <Paperclip size={28} className="mx-auto text-slate-200 mb-2" />
+              <p className="text-sm text-slate-400">Sin adjuntos</p>
+              <button onClick={() => fileRef.current?.click()}
+                className="mt-2 text-xs text-brand hover:underline">
+                Añadir documentación
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Fotos */}
+              {fotos.length > 0 && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-2">
+                    <ImageIcon size={11} className="inline mr-1" />Fotos ({fotos.length})
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {fotos.map(f => (
+                      <a key={f.id} href={f.url} target="_blank" rel="noreferrer"
+                        className="aspect-square rounded-lg overflow-hidden border border-slate-200 hover:border-brand transition-colors">
+                        <img src={f.url} alt={f.nombre ?? 'foto'}
+                          className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Documentos PDF */}
+              {docs.length > 0 && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-2">
+                    <FileText size={11} className="inline mr-1" />Documentos ({docs.length})
+                  </p>
+                  <ul className="space-y-1.5">
+                    {docs.map(d => (
+                      <li key={d.id}>
+                        <a href={d.url} target="_blank" rel="noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors group">
+                          <FileText size={15} className="text-red-500 flex-shrink-0" />
+                          <span className="text-xs text-slate-700 truncate flex-1">
+                            {d.nombre ?? 'Documento'}
+                          </span>
+                          <span className="text-[10px] text-brand opacity-0 group-hover:opacity-100 flex-shrink-0">
+                            Abrir →
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── Cabecera de columna ordenable ───────────────────────────────────────────
 type SortKey = 'instalacion' | 'tipo' | 'tecnico' | 'fecha' | 'estado';
 type SortDir = 'asc' | 'desc';
@@ -264,6 +410,7 @@ function ColHeader({
 export default function Visitas() {
   const { data = [], isLoading } = useQuery({ queryKey: ['visitas'], queryFn: api.list });
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Visita | null>(null);
 
   // Búsqueda global
   const [busqueda, setBusqueda] = useState('');
@@ -448,18 +595,22 @@ export default function Visitas() {
                   <ColHeader label="Técnico" sortKey="tecnico" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <ColHeader label="Fecha" sortKey="fecha" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <ColHeader label="Estado" sortKey="estado" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <th className="px-4 py-3 w-8" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtradas.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-400">
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">
                       No hay visitas que coincidan con los filtros
                     </td>
                   </tr>
                 )}
                 {filtradas.map(v => (
-                  <tr key={v.id} className="hover:bg-slate-50">
+                  <tr key={v.id}
+                    className="hover:bg-slate-50 cursor-pointer"
+                    onClick={() => setSelected(v)}
+                  >
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-900">{v.instalacion?.nombre ?? '—'}</p>
                       <p className="text-xs text-slate-400">{v.instalacion?.cliente}</p>
@@ -473,6 +624,9 @@ export default function Visitas() {
                       })}
                     </td>
                     <td className="px-4 py-3"><Badge value={v.estado} /></td>
+                    <td className="px-4 py-3 text-slate-300">
+                      <ChevronDown size={14} className="-rotate-90" />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -481,6 +635,7 @@ export default function Visitas() {
         )}
 
       {open && <Modal onClose={() => setOpen(false)} />}
+      {selected && <VisitaPanel visita={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
