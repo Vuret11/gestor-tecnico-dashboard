@@ -17,8 +17,12 @@ function ClienteModal({ item, onClose }: { item?: Cliente; onClose: () => void }
   });
 
   const save = useMutation({
-    mutationFn: () =>
-      item ? api.update(item.id, form) : api.create(form),
+    mutationFn: () => {
+      const data = Object.fromEntries(
+        Object.entries(form).filter(([, v]) => v !== ''),
+      ) as Partial<Cliente>;
+      return item ? api.update(item.id, data) : api.create(data);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });
       onClose();
@@ -99,7 +103,12 @@ function InstalacionModal({ cliente, onClose }: { cliente: Cliente; onClose: () 
   });
 
   const save = useMutation({
-    mutationFn: () => instApi.create(form),
+    mutationFn: () => {
+      const data = Object.fromEntries(
+        Object.entries(form).filter(([, v]) => v !== ''),
+      ) as Partial<Instalacion>;
+      return instApi.create(data);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['instalaciones-cliente', cliente.id] });
       qc.invalidateQueries({ queryKey: ['instalaciones'] });
