@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi } from '../api/endpoints';
-import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2 } from 'lucide-react';
+import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2, Pencil, AlertTriangle } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import type { TipoVisita, EstadoVisita, Visita } from '../types';
 
@@ -36,19 +36,21 @@ function TipoBadge({ tipo }: { tipo?: TipoVisita }) {
   );
 }
 
-// ─── Modal programar visita ───────────────────────────────────────────────────
-function Modal({ onClose }: { onClose: () => void }) {
+// ─── Modal programar / editar visita ─────────────────────────────────────────
+function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) {
   const qc = useQueryClient();
   const { data: insts = [] } = useQuery({ queryKey: ['instalaciones'], queryFn: instApi.list });
   const { data: users = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
   const tecnicos = users.filter(u => u.rol === 'tecnico' && u.activo);
 
   const [form, setForm] = useState({
-    instalacion_id: '',
-    tecnico_id: '',
-    fechaProgramada: '',
-    tipo: 'visita_tecnica_fv' as TipoVisita,
-    notas: '',
+    instalacion_id: editing?.instalacion_id ?? '',
+    tecnico_id: editing?.tecnico_id ?? '',
+    fechaProgramada: editing?.fechaProgramada
+      ? new Date(editing.fechaProgramada).toISOString().slice(0, 16)
+      : '',
+    tipo: (editing?.tipo ?? 'visita_tecnica_fv') as TipoVisita,
+    notas: editing?.notas ?? '',
   });
   const [busqInst, setBusqInst] = useState('');
   const [adjuntos, setAdjuntos] = useState<File[]>([]);
@@ -72,14 +74,16 @@ function Modal({ onClose }: { onClose: () => void }) {
   };
 
   const save = useMutation({
-    mutationFn: () => api.create(form as any),
+    mutationFn: () => editing
+      ? api.update(editing.id, form as any)
+      : api.create(form as any),
     onSuccess: async (visita) => {
-      if (adjuntos.length > 0) {
+      if (!editing && adjuntos.length > 0) {
         setUploading(true);
         try {
           await Promise.all(adjuntos.map(f => fotosApi.upload(visita.id, f)));
         } catch {
-          setUploadError('Visita creada, pero algún adjunto no se subió correctamente.');
+          setUploadError('Visita guardada, pero algún adjunto no se subió correctamente.');
           setUploading(false);
           qc.invalidateQueries({ queryKey: ['visitas'] });
           qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
@@ -103,7 +107,7 @@ function Modal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-          <h2 className="font-semibold text-slate-900">Programar visita</h2>
+          <h2 className="font-semibold text-slate-900">{editing ? 'Editar visita' : 'Programar visita'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
         <div className="p-6 space-y-4 max-h-[72vh] overflow-y-auto">
@@ -225,7 +229,7 @@ function Modal({ onClose }: { onClose: () => void }) {
           <button onClick={() => save.mutate()}
             disabled={busy || !form.instalacion_id || !form.tecnico_id || !form.fechaProgramada}
             className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50">
-            {uploading ? `Subiendo ${adjuntos.length} archivo${adjuntos.length > 1 ? 's' : ''}...` : save.isPending ? 'Guardando...' : 'Programar'}
+            {uploading ? `Subiendo ${adjuntos.length} archivo${adjuntos.length > 1 ? 's' : ''}...` : save.isPending ? 'Guardando...' : editing ? 'Guardar cambios' : 'Programar'}
           </button>
         </div>
       </div>
@@ -235,12 +239,24 @@ function Modal({ onClose }: { onClose: () => void }) {
 
 // ─── Panel lateral: detalle + adjuntos de una visita ─────────────────────────
 function VisitaPanel({ visita, onClose }: { visita: Visita; onClose: () => void }) {
+  const qc = useQueryClient();
   const { data: adjuntos = [], isLoading, refetch } = useQuery({
     queryKey: ['fotos-visita', visita.id],
     queryFn: () => fotosApi.porVisita(visita.id),
   });
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const eliminar = useMutation({
+    mutationFn: () => api.cancel(visita.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['visitas'] });
+      qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
+      onClose();
+    },
+  });
 
   const uploadFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -273,6 +289,47 @@ function VisitaPanel({ visita, onClose }: { visita: Visita; onClose: () => void 
             <TipoBadge tipo={visita.tipo} />
             <Badge value={visita.estado} />
           </div>
+          {/* Acciones */}
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => setEditando(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand text-white rounded-lg hover:bg-brand-dark"
+            >
+              <Pencil size={12} /> Editar
+            </button>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
+            >
+              <Trash2 size={12} /> Eliminar
+            </button>
+          </div>
+
+          {/* Confirmación eliminar */}
+          {confirmDelete && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle size={14} className="text-red-500 flex-shrink-0" />
+                <p className="text-xs font-medium text-red-700">¿Eliminar esta visita?</p>
+              </div>
+              <p className="text-xs text-red-600 mb-3">Esta acción no se puede deshacer.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => eliminar.mutate()}
+                  disabled={eliminar.isPending}
+                  className="px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {eliminar.isPending ? 'Eliminando...' : 'Sí, eliminar'}
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Detalles */}
@@ -375,6 +432,13 @@ function VisitaPanel({ visita, onClose }: { visita: Visita; onClose: () => void 
           )}
         </div>
       </div>
+
+      {editando && (
+        <Modal
+          editing={visita}
+          onClose={() => setEditando(false)}
+        />
+      )}
     </>
   );
 }
