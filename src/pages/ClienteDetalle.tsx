@@ -190,10 +190,12 @@ export default function ClienteDetalle() {
 
   const [editPartner, setEditPartner] = useState(false);
   const [instModal, setInstModal] = useState<{ open: boolean; item?: Instalacion }>({ open: false });
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const eliminarInst = useMutation({
     mutationFn: (instId: string) => instApi.remove(instId),
     onSuccess: () => {
+      setConfirmDelete(null);
       qc.invalidateQueries({ queryKey: ['instalaciones-cliente', id] });
       qc.invalidateQueries({ queryKey: ['instalaciones'] });
     },
@@ -318,7 +320,7 @@ export default function ClienteDetalle() {
         ) : (
           <ul className="divide-y divide-slate-100">
             {insts.map((inst: Instalacion) => (
-              <li key={inst.id} className="px-6 py-4 hover:bg-slate-50 group flex items-start justify-between">
+              <li key={inst.id} className="px-6 py-4 hover:bg-slate-50 flex items-start justify-between">
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Building2 size={14} className="text-slate-500" />
@@ -345,23 +347,43 @@ export default function ClienteDetalle() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button
-                    onClick={() => setInstModal({ open: true, item: inst })}
-                    className="text-slate-300 hover:text-brand p-1"
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`¿Eliminar "${inst.nombre}"? Esta acción no se puede deshacer.`)) {
-                        eliminarInst.mutate(inst.id);
-                      }
-                    }}
-                    className="text-slate-300 hover:text-red-500 p-1"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  {confirmDelete === inst.id ? (
+                    <>
+                      <span className="text-xs text-red-600 mr-1">¿Eliminar?</span>
+                      <button
+                        onClick={() => eliminarInst.mutate(inst.id)}
+                        disabled={eliminarInst.isPending}
+                        className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 disabled:opacity-50"
+                      >
+                        Sí
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="text-xs border border-slate-200 px-2 py-1 rounded hover:bg-slate-50"
+                      >
+                        No
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setInstModal({ open: true, item: inst })}
+                        className="text-slate-400 hover:text-brand p-1"
+                        title="Editar"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(inst.id)}
+                        className="text-slate-400 hover:text-red-500 p-1"
+                        title="Eliminar"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </li>
             ))}
