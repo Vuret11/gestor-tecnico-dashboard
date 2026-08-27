@@ -198,7 +198,11 @@ export default function ClienteDetalle() {
       setConfirmDelete(null);
       qc.invalidateQueries({ queryKey: ['instalaciones-cliente', id] });
       qc.invalidateQueries({ queryKey: ['instalaciones'] });
+      qc.invalidateQueries({ queryKey: ['plan-obras'] });
+      qc.invalidateQueries({ queryKey: ['plan-semana'] });
+      qc.invalidateQueries({ queryKey: ['visitas-semana'] });
     },
+    onError: () => setConfirmDelete(null),
   });
 
   const { data: cliente, isLoading: loadingCliente } = useQuery({
@@ -351,7 +355,9 @@ export default function ClienteDetalle() {
                 <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                   {confirmDelete === inst.id ? (
                     <>
-                      <span className="text-xs text-red-600 mr-1">¿Eliminar?</span>
+                      <span className="text-xs text-red-600 mr-1">
+                        {eliminarInst.isPending ? 'Eliminando...' : '¿Eliminar?'}
+                      </span>
                       <button
                         onClick={() => eliminarInst.mutate(inst.id)}
                         disabled={eliminarInst.isPending}
@@ -361,7 +367,8 @@ export default function ClienteDetalle() {
                       </button>
                       <button
                         onClick={() => setConfirmDelete(null)}
-                        className="text-xs border border-slate-200 px-2 py-1 rounded hover:bg-slate-50"
+                        disabled={eliminarInst.isPending}
+                        className="text-xs border border-slate-200 px-2 py-1 rounded hover:bg-slate-50 disabled:opacity-50"
                       >
                         No
                       </button>
