@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { planificacion as api } from '../../api/endpoints';
 import type { PlanAsignacion, PlanTecnico, EstadoEspecial } from '../../types';
@@ -37,15 +37,20 @@ function dateStr(d: Date) {
 }
 
 function AsignacionCell({
-  asig, onClick, onDelete,
+  asig, onClick, onDelete, onDragStart,
 }: {
   asig: PlanAsignacion;
   onClick: () => void;
   onDelete: () => void;
+  onDragStart: () => void;
 }) {
   if (asig.estadoEspecial) {
     return (
-      <div className={`rounded-md px-2 py-1.5 text-xs font-medium ${ESTADO_ESPECIAL_COLOR[asig.estadoEspecial]} flex items-center justify-between gap-1`}>
+      <div
+        draggable
+        onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(); }}
+        className={`rounded-md px-2 py-1.5 text-xs font-medium ${ESTADO_ESPECIAL_COLOR[asig.estadoEspecial]} flex items-center justify-between gap-1 cursor-grab active:cursor-grabbing`}
+      >
         <span className="truncate">{ESTADO_ESPECIAL_LABELS[asig.estadoEspecial]}</span>
         <button onClick={e => { e.stopPropagation(); onDelete(); }} className="flex-shrink-0 opacity-60 hover:opacity-100">
           <X size={10} />
@@ -55,8 +60,10 @@ function AsignacionCell({
   }
   return (
     <div
+      draggable
+      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(); }}
       onClick={onClick}
-      className={`rounded-md px-2 py-1.5 text-xs cursor-pointer border transition-all group
+      className={`rounded-md px-2 py-1.5 text-xs cursor-grab active:cursor-grabbing border transition-all group
         ${asig.viaja ? 'bg-red-50 border-red-200 hover:border-red-400' : 'bg-brand/5 border-brand/20 hover:border-brand/50'}`}
     >
       <div className="flex items-center justify-between gap-1 mb-0.5">
@@ -77,19 +84,29 @@ function AsignacionCell({
 }
 
 function AsignacionModal({
-  tecnico, fecha, onClose,
+  tecnico, fecha, asignacion, onClose,
 }: {
   tecnico: PlanTecnico;
   fecha: string;
+  asignacion?: PlanAsignacion;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
   const { data: obras = [] } = useQuery({ queryKey: ['plan-obras'], queryFn: () => api.obras.list() });
-  const [modo, setModo] = useState<'obra' | 'estado'>('obra');
-  const [obraId, setObraId] = useState('');
-  const [estadoEspecial, setEstadoEspecial] = useState<EstadoEspecial | ''>('');
-  const [viaja, setViaja] = useState(false);
-  const [observaciones, setObs] = useState('');
+
+  const esEdicion = !!asignacion;
+  const modoInicial = asignacion?.estadoEspecial ? 'estado' : 'obra';
+
+  const [modo, setModo] = useState<'obra' | 'estado'>(modoInicial);
+  const [obraId, setObraId] = useState(asignacion?.obra_id ?? '');
+  const [estadoEspecial, setEstadoEspecial] = useState<EstadoEspecial | ''>(asignacion?.estadoEspecial ?? '');
+  const [viaja, setViaja] = useState(asignacion?.viaja ?? false);
+  const [observaciones, setObs] = useState(asignacion?.observaciones ?? '');
+
+  const invalidar = () => {
+    qc.invalidateQueries({ queryKey: ['plan-semana'] });
+    qc.invalidateQueries({ queryKey: ['plan-conflictos'] });
+  };
 
   const crear = useMutation({
     mutationFn: () => api.asignaciones.create({
@@ -100,25 +117,34 @@ function AsignacionModal({
       viaja,
       observaciones,
     }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['plan-semana'] });
-      onClose();
-    },
+    onSuccess: () => { invalidar(); onClose(); },
   });
+
+  const editar = useMutation({
+    mutationFn: () => api.asignaciones.update(asignacion!.id, {
+      obra_id: modo === 'obra' ? obraId : undefined,
+      estadoEspecial: modo === 'estado' ? (estadoEspecial as EstadoEspecial) : null,
+      viaja,
+      observaciones,
+    }),
+    onSuccess: () => { invalidar(); onClose(); },
+  });
+
+  const mutation = esEdicion ? editar : crear;
+  const disabled = mutation.isPending || (modo === 'obra' ? !obraId : !estadoEspecial);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center">
           <div>
-            <h2 className="font-semibold text-slate-900">Nueva asignación</h2>
+            <h2 className="font-semibold text-slate-900">{esEdicion ? 'Editar asignación' : 'Nueva asignación'}</h2>
             <p className="text-xs text-slate-500">{tecnico.nombre} · {new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">&times;</button>
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Tipo */}
           <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
             {(['obra', 'estado'] as const).map(m => (
               <button key={m} onClick={() => setModo(m)}
@@ -169,9 +195,9 @@ function AsignacionModal({
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none" />
           </div>
 
-          {crear.isError && (
+          {mutation.isError && (
             <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-              {(crear.error as any)?.response?.data?.message ?? 'Error al guardar'}
+              {(mutation.error as any)?.response?.data?.message ?? 'Error al guardar'}
             </div>
           )}
         </div>
@@ -179,11 +205,11 @@ function AsignacionModal({
         <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">Cancelar</button>
           <button
-            onClick={() => crear.mutate()}
-            disabled={crear.isPending || (modo === 'obra' ? !obraId : !estadoEspecial)}
+            onClick={() => mutation.mutate()}
+            disabled={disabled}
             className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50"
           >
-            {crear.isPending ? 'Guardando...' : 'Asignar'}
+            {mutation.isPending ? 'Guardando...' : esEdicion ? 'Guardar cambios' : 'Asignar'}
           </button>
         </div>
       </div>
@@ -195,7 +221,11 @@ export default function PlanSemanal() {
   const qc = useQueryClient();
   const [cursor, setCursor] = useState(new Date());
   const [provinciaId, setProvinciaId] = useState('');
-  const [modal, setModal] = useState<{ tecnico: PlanTecnico; fecha: string } | null>(null);
+  const [modal, setModal] = useState<{ tecnico: PlanTecnico; fecha: string; asignacion?: PlanAsignacion } | null>(null);
+
+  // Drag & drop state
+  const draggedId = useRef<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null); // `${tecnicoId}_${fecha}`
 
   const weekStart = useMemo(() => getWeekStart(cursor), [cursor]);
   const weekDays = useMemo(() =>
@@ -224,7 +254,19 @@ export default function PlanSemanal() {
 
   const eliminar = useMutation({
     mutationFn: (id: string) => api.asignaciones.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['plan-semana'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plan-semana'] });
+      qc.invalidateQueries({ queryKey: ['plan-conflictos'] });
+    },
+  });
+
+  const mover = useMutation({
+    mutationFn: ({ id, tecnico_id, fecha }: { id: string; tecnico_id: string; fecha: string }) =>
+      api.asignaciones.update(id, { tecnico_id, fecha }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plan-semana'] });
+      qc.invalidateQueries({ queryKey: ['plan-conflictos'] });
+    },
   });
 
   // Mapa: tecnicoId → fecha → asignaciones
@@ -250,13 +292,11 @@ export default function PlanSemanal() {
           <p className="text-sm text-slate-500">{semanaLabel}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* Provincia */}
           <select value={provinciaId} onChange={e => setProvinciaId(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
             <option value="">Todas las provincias</option>
             {provincias.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
           </select>
-          {/* Navegación semana */}
           <div className="flex items-center gap-1 border border-slate-200 rounded-lg overflow-hidden">
             <button onClick={() => { const d = new Date(cursor); d.setDate(d.getDate() - 7); setCursor(d); }}
               className="p-2 hover:bg-slate-100 text-slate-600"><ChevronLeft size={16} /></button>
@@ -269,12 +309,12 @@ export default function PlanSemanal() {
       </div>
 
       {/* Conflictos */}
-      {conflictos.length > 0 && (
+      {(conflictos as any[]).length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-3">
           <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-red-700">{conflictos.length} conflicto{conflictos.length > 1 ? 's' : ''} detectado{conflictos.length > 1 ? 's' : ''}</p>
-            {conflictos.slice(0, 3).map((c: any, i: number) => (
+            <p className="text-sm font-medium text-red-700">{(conflictos as any[]).length} conflicto{(conflictos as any[]).length > 1 ? 's' : ''} detectado{(conflictos as any[]).length > 1 ? 's' : ''}</p>
+            {(conflictos as any[]).slice(0, 3).map((c: any, i: number) => (
               <p key={i} className="text-xs text-red-600">{c.mensaje}</p>
             ))}
           </div>
@@ -312,9 +352,9 @@ export default function PlanSemanal() {
                   </tr>
                 )}
                 {tecnicos.map(t => (
-                  <tr key={t.id} className="hover:bg-slate-50/50">
+                  <tr key={t.id} className="hover:bg-slate-50/50 group">
                     {/* Técnico */}
-                    <td className="px-4 py-2 sticky left-0 bg-white border-r border-slate-100 z-10">
+                    <td className="px-4 py-2 sticky left-0 bg-white border-r border-slate-100 z-10 group-hover:bg-slate-50/50">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
                           <span className="text-brand text-[10px] font-bold">{t.nombre[0]}</span>
@@ -328,23 +368,41 @@ export default function PlanSemanal() {
                     {/* Días */}
                     {weekDays.map((d, i) => {
                       const fecha = dateStr(d);
+                      const cellKey = `${t.id}_${fecha}`;
                       const celdaAsigs = mapa.get(t.id)?.get(fecha) ?? [];
                       const esFinde = i >= 5;
+                      const isDragOver = dragOverKey === cellKey;
                       return (
-                        <td key={i} className={`px-2 py-2 align-top ${esFinde ? 'bg-slate-50/60' : ''}`}>
+                        <td
+                          key={i}
+                          className={`px-2 py-2 align-top transition-colors
+                            ${esFinde ? 'bg-slate-50/60' : ''}
+                            ${isDragOver ? 'bg-brand/10 outline outline-2 outline-dashed outline-brand/40' : ''}`}
+                          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverKey(cellKey); }}
+                          onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null); }}
+                          onDrop={e => {
+                            e.preventDefault();
+                            setDragOverKey(null);
+                            if (draggedId.current) {
+                              mover.mutate({ id: draggedId.current, tecnico_id: t.id, fecha });
+                              draggedId.current = null;
+                            }
+                          }}
+                        >
                           <div className="space-y-1 min-h-[48px]">
                             {celdaAsigs.map(a => (
                               <AsignacionCell
                                 key={a.id}
                                 asig={a}
-                                onClick={() => {}}
+                                onClick={() => setModal({ tecnico: t, fecha, asignacion: a })}
                                 onDelete={() => eliminar.mutate(a.id)}
+                                onDragStart={() => { draggedId.current = a.id; }}
                               />
                             ))}
-                            {/* Botón añadir */}
+                            {/* Botón añadir — visible al pasar el ratón */}
                             <button
                               onClick={() => setModal({ tecnico: t, fecha })}
-                              className="w-full text-center text-slate-300 hover:text-brand hover:bg-brand/5 rounded-md py-1 text-xs transition-colors opacity-0 hover:opacity-100 group-hover:opacity-100"
+                              className="w-full text-center text-slate-300 hover:text-brand hover:bg-brand/5 rounded-md py-1 text-xs transition-colors opacity-0 group-hover:opacity-100"
                             >
                               <Plus size={12} className="mx-auto" />
                             </button>
@@ -359,11 +417,17 @@ export default function PlanSemanal() {
           </div>
         )}
 
-      {/* Hover hint */}
-      <p className="text-xs text-slate-400 text-center">Pasa el ratón sobre una celda y pulsa + para añadir una asignación</p>
+      <p className="text-xs text-slate-400 text-center">
+        Pasa el ratón y pulsa + para añadir · Arrastra una tarjeta para moverla a otro técnico/día
+      </p>
 
       {modal && (
-        <AsignacionModal tecnico={modal.tecnico} fecha={modal.fecha} onClose={() => setModal(null)} />
+        <AsignacionModal
+          tecnico={modal.tecnico}
+          fecha={modal.fecha}
+          asignacion={modal.asignacion}
+          onClose={() => setModal(null)}
+        />
       )}
     </div>
   );
