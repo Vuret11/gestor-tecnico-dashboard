@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instalaciones as api, clientes as clientesApi } from '../api/endpoints';
 import type { Instalacion, Cliente } from '../types';
-import { Plus, Pencil, MapPin } from 'lucide-react';
+import { Plus, Pencil, MapPin, Trash2 } from 'lucide-react';
 
 function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
   const qc = useQueryClient();
@@ -116,8 +116,24 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
 }
 
 export default function Instalaciones() {
+  const qc = useQueryClient();
   const { data = [], isLoading } = useQuery({ queryKey: ['instalaciones'], queryFn: api.list });
   const [modal, setModal] = useState<{ open: boolean; item?: Instalacion }>({ open: false });
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const eliminar = useMutation({
+    mutationFn: (id: string) => api.remove(id),
+    onSuccess: () => {
+      setConfirmDelete(null);
+      setDeleteError(null);
+      qc.invalidateQueries({ queryKey: ['instalaciones'] });
+    },
+    onError: (err: any) => {
+      setConfirmDelete(null);
+      setDeleteError(err?.response?.data?.message ?? err?.message ?? 'Error al eliminar');
+    },
+  });
 
   return (
     <div className="p-6">
@@ -164,11 +180,33 @@ export default function Instalaciones() {
                       <span className="flex items-center gap-1"><MapPin size={12} />{inst.ciudad}</span>
                     </td>
                     <td className="px-4 py-3 text-slate-500">{inst.telefono || '—'}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
                       <button onClick={() => setModal({ open: true, item: inst })}
                         className="text-slate-400 hover:text-brand p-1">
                         <Pencil size={14} />
                       </button>
+                      {confirmDelete === inst.id ? (
+                        <>
+                          <span className="text-xs text-red-600 mr-1">¿Eliminar?</span>
+                          <button
+                            onClick={() => eliminar.mutate(inst.id)}
+                            disabled={eliminar.isPending}
+                            className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 disabled:opacity-50"
+                          >Sí</button>
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            className="text-xs border border-slate-200 px-2 py-1 rounded hover:bg-slate-50"
+                          >No</button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => { setDeleteError(null); setConfirmDelete(inst.id); }}
+                          className="text-slate-400 hover:text-red-500 p-1"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -176,6 +214,12 @@ export default function Instalaciones() {
             </table>
           </div>
         )}
+
+      {deleteError && (
+        <div className="mt-3 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {deleteError}
+        </div>
+      )}
 
       {modal.open && <Modal item={modal.item} onClose={() => setModal({ open: false })} />}
     </div>
