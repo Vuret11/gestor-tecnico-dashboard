@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { planificacion as api } from '../../api/endpoints';
 import type { PlanTecnico, PlanProvincia, TipoTecnico } from '../../types';
-import { Plus, Pencil, Trash2, Plane } from 'lucide-react';
+import { Plus, Pencil, Trash2, Plane, RefreshCw } from 'lucide-react';
 
 const TIPO_LABELS: Record<TipoTecnico, string> = {
   propio: 'Propio', externo: 'Externo', subcontrata: 'Subcontrata',
@@ -25,7 +25,10 @@ function TecnicoModal({ item, provincias, onClose }: { item?: PlanTecnico; provi
   });
 
   const save = useMutation({
-    mutationFn: () => item ? api.tecnicos.update(item.id, form) : api.tecnicos.create(form),
+    mutationFn: () => {
+      const data = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''));
+      return item ? api.tecnicos.update(item.id, data) : api.tecnicos.create(data);
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['plan-tecnicos'] }); onClose(); },
   });
 
@@ -111,6 +114,16 @@ export default function PlanTecnicos() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<{ open: boolean; item?: PlanTecnico }>({ open: false });
   const [filtroProv, setFiltroProv] = useState('');
+  const [syncMsg, setSyncMsg] = useState('');
+
+  const sincronizar = useMutation({
+    mutationFn: () => api.tecnicos.sincronizar(),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['plan-tecnicos'] });
+      setSyncMsg(`${data.creados} nuevo${data.creados !== 1 ? 's' : ''}, ${data.reactivados} reactivado${data.reactivados !== 1 ? 's' : ''}`);
+      setTimeout(() => setSyncMsg(''), 4000);
+    },
+  });
 
   const { data: provincias = [] } = useQuery({ queryKey: ['plan-provincias'], queryFn: api.provincias.list });
   const { data: tecnicos = [], isLoading } = useQuery({
@@ -143,6 +156,18 @@ export default function PlanTecnicos() {
             <option value="">Todas las provincias</option>
             {provincias.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
           </select>
+          <button
+            onClick={() => sincronizar.mutate()}
+            disabled={sincronizar.isPending}
+            title="Importar técnicos del sistema (usuarios con rol técnico)"
+            className="flex items-center gap-2 border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={sincronizar.isPending ? 'animate-spin' : ''} />
+            Sincronizar
+          </button>
+          {syncMsg && (
+            <span className="text-xs text-green-600 font-medium">{syncMsg}</span>
+          )}
           <button onClick={() => setModal({ open: true })}
             className="flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg text-sm hover:bg-brand-dark">
             <Plus size={16} /> Nuevo técnico

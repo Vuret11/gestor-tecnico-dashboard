@@ -186,10 +186,20 @@ export interface PlanCliente {
 export type EstadoObra = 'pendiente' | 'planificada' | 'confirmada' | 'en_curso' | 'realizada' | 'cancelada' | 'reprogramada';
 export type TipoTrabajo = 'instalacion_fv' | 'instalacion_aerotermia' | 'mantenimiento' | 'incidencia' | 'visita_tecnica' | 'otro';
 
+export interface InstalacionResumen {
+  id: string;
+  nombre: string;
+  ciudad?: string;
+  provincia?: string;
+  direccion?: string;
+}
+
 export interface PlanObra {
   id: string;
   numeroObra: string;
   nombre: string;
+  instalacion?: InstalacionResumen;
+  instalacion_id?: string;
   cliente?: PlanCliente;
   cliente_id?: string;
   provincia?: PlanProvincia;

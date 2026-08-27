@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { planificacion as api } from '../../api/endpoints';
 import type { PlanAsignacion, PlanTecnico, EstadoEspecial } from '../../types';
@@ -58,6 +58,12 @@ function AsignacionCell({
       </div>
     );
   }
+  const instalacion = asig.obra?.instalacion;
+  const lineaPrincipal = instalacion?.nombre ?? asig.obra?.numeroObra ?? '—';
+  const lineaSecundaria = instalacion
+    ? instalacion.ciudad ?? asig.obra?.nombre
+    : asig.obra?.nombre;
+
   return (
     <div
       draggable
@@ -67,7 +73,7 @@ function AsignacionCell({
         ${asig.viaja ? 'bg-red-50 border-red-200 hover:border-red-400' : 'bg-brand/5 border-brand/20 hover:border-brand/50'}`}
     >
       <div className="flex items-center justify-between gap-1 mb-0.5">
-        <span className="font-bold text-slate-900 truncate">{asig.obra?.numeroObra}</span>
+        <span className="font-bold text-slate-900 truncate">{lineaPrincipal}</span>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {asig.viaja && <Plane size={9} className="text-red-500" />}
           <button onClick={e => { e.stopPropagation(); onDelete(); }} className="opacity-0 group-hover:opacity-60 hover:!opacity-100">
@@ -75,7 +81,7 @@ function AsignacionCell({
           </button>
         </div>
       </div>
-      <p className="text-slate-600 truncate leading-tight">{asig.obra?.nombre}</p>
+      {lineaSecundaria && <p className="text-slate-600 truncate leading-tight">{lineaSecundaria}</p>}
       {asig.obra?.cliente && (
         <p className="text-slate-400 truncate leading-tight text-[10px]">{asig.obra.cliente.nombre}</p>
       )}
@@ -93,6 +99,7 @@ function AsignacionModal({
 }) {
   const qc = useQueryClient();
   const { data: obras = [] } = useQuery({ queryKey: ['plan-obras'], queryFn: () => api.obras.list() });
+  const { data: instalaciones = [] } = useQuery({ queryKey: ['plan-instalaciones-sistema'], queryFn: () => api.instalacionesSistema.list() });
 
   const esEdicion = !!asignacion;
   const modoInicial = asignacion?.estadoEspecial ? 'estado' : 'obra';
@@ -155,17 +162,21 @@ function AsignacionModal({
           </div>
 
           {modo === 'obra' ? (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Obra *</label>
-              <select value={obraId} onChange={e => setObraId(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
-                <option value="">— Seleccionar obra —</option>
-                {obras.map(o => (
-                  <option key={o.id} value={o.id}>
-                    {o.numeroObra} · {o.nombre}{o.cliente ? ` (${o.cliente.nombre})` : ''}
-                  </option>
-                ))}
-              </select>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Instalación *</label>
+                <select value={obraId} onChange={e => setObraId(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
+                  <option value="">— Seleccionar instalación —</option>
+                  {obras.map(o => (
+                    <option key={o.id} value={o.id}>
+                      {o.instalacion
+                        ? `${o.instalacion.nombre}${o.instalacion.ciudad ? ` · ${o.instalacion.ciudad}` : ''}`
+                        : `${o.numeroObra} · ${o.nombre}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           ) : (
             <div>
@@ -269,6 +280,21 @@ export default function PlanSemanal() {
     },
   });
 
+  // Técnicos agrupados por provincia (orden alfabético, sin-provincia al final)
+  const gruposProvincia = useMemo(() => {
+    const m = new Map<string, { provincia: typeof tecnicos[0]['provincia']; tecnicos: typeof tecnicos }>();
+    tecnicos.forEach(t => {
+      const key = t.provincia_id ?? '__sin__';
+      if (!m.has(key)) m.set(key, { provincia: t.provincia, tecnicos: [] });
+      m.get(key)!.tecnicos.push(t);
+    });
+    return [...m.values()].sort((a, b) => {
+      if (!a.provincia) return 1;
+      if (!b.provincia) return -1;
+      return a.provincia.nombre.localeCompare(b.provincia.nombre, 'es');
+    });
+  }, [tecnicos]);
+
   // Mapa: tecnicoId → fecha → asignaciones
   const mapa = useMemo(() => {
     const m = new Map<string, Map<string, PlanAsignacion[]>>();
@@ -343,7 +369,7 @@ export default function PlanSemanal() {
                   })}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {tecnicos.length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-400">
@@ -351,66 +377,89 @@ export default function PlanSemanal() {
                     </td>
                   </tr>
                 )}
-                {tecnicos.map(t => (
-                  <tr key={t.id} className="hover:bg-slate-50/50 group">
-                    {/* Técnico */}
-                    <td className="px-4 py-2 sticky left-0 bg-white border-r border-slate-100 z-10 group-hover:bg-slate-50/50">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-brand text-[10px] font-bold">{t.nombre[0]}</span>
+                {gruposProvincia.map(({ provincia, tecnicos: ts }) => (
+                  <Fragment key={provincia?.id ?? '__sin__'}>
+                    {/* Cabecera de provincia */}
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-4 py-1.5 sticky left-0"
+                        style={{ backgroundColor: provincia?.color ? `${provincia.color}18` : '#f1f5f9' }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: provincia?.color ?? '#94a3b8' }}
+                          />
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                            {provincia?.nombre ?? 'Sin provincia'}
+                          </span>
+                          <span className="text-xs text-slate-400 font-normal">({ts.length} técnicos)</span>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-900 truncate">{t.nombre}</p>
-                          <p className="text-[10px] text-slate-400">{t.provincia?.nombre ?? '—'}</p>
-                        </div>
-                      </div>
-                    </td>
-                    {/* Días */}
-                    {weekDays.map((d, i) => {
-                      const fecha = dateStr(d);
-                      const cellKey = `${t.id}_${fecha}`;
-                      const celdaAsigs = mapa.get(t.id)?.get(fecha) ?? [];
-                      const esFinde = i >= 5;
-                      const isDragOver = dragOverKey === cellKey;
-                      return (
-                        <td
-                          key={i}
-                          className={`px-2 py-2 align-top transition-colors
-                            ${esFinde ? 'bg-slate-50/60' : ''}
-                            ${isDragOver ? 'bg-brand/10 outline outline-2 outline-dashed outline-brand/40' : ''}`}
-                          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverKey(cellKey); }}
-                          onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null); }}
-                          onDrop={e => {
-                            e.preventDefault();
-                            setDragOverKey(null);
-                            if (draggedId.current) {
-                              mover.mutate({ id: draggedId.current, tecnico_id: t.id, fecha });
-                              draggedId.current = null;
-                            }
-                          }}
-                        >
-                          <div className="space-y-1 min-h-[48px]">
-                            {celdaAsigs.map(a => (
-                              <AsignacionCell
-                                key={a.id}
-                                asig={a}
-                                onClick={() => setModal({ tecnico: t, fecha, asignacion: a })}
-                                onDelete={() => eliminar.mutate(a.id)}
-                                onDragStart={() => { draggedId.current = a.id; }}
-                              />
-                            ))}
-                            {/* Botón añadir — visible al pasar el ratón */}
-                            <button
-                              onClick={() => setModal({ tecnico: t, fecha })}
-                              className="w-full text-center text-slate-300 hover:text-brand hover:bg-brand/5 rounded-md py-1 text-xs transition-colors opacity-0 group-hover:opacity-100"
+                      </td>
+                    </tr>
+                    {/* Filas de técnicos */}
+                    {ts.map(t => (
+                      <tr key={t.id} className="hover:bg-slate-50/50 group border-t border-slate-100">
+                        {/* Técnico */}
+                        <td className="px-4 py-2 sticky left-0 bg-white border-r border-slate-100 z-10 group-hover:bg-slate-50/50">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold"
+                              style={{ backgroundColor: provincia?.color ?? '#94a3b8' }}
                             >
-                              <Plus size={12} className="mx-auto" />
-                            </button>
+                              {t.nombre[0]}
+                            </div>
+                            <p className="text-xs font-semibold text-slate-900 truncate">{t.nombre}</p>
                           </div>
                         </td>
-                      );
-                    })}
-                  </tr>
+                        {/* Días */}
+                        {weekDays.map((d, i) => {
+                          const fecha = dateStr(d);
+                          const cellKey = `${t.id}_${fecha}`;
+                          const celdaAsigs = mapa.get(t.id)?.get(fecha) ?? [];
+                          const esFinde = i >= 5;
+                          const isDragOver = dragOverKey === cellKey;
+                          return (
+                            <td
+                              key={i}
+                              className={`px-2 py-2 align-top transition-colors
+                                ${esFinde ? 'bg-slate-50/60' : ''}
+                                ${isDragOver ? 'bg-brand/10 outline outline-2 outline-dashed outline-brand/40' : ''}`}
+                              onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverKey(cellKey); }}
+                              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null); }}
+                              onDrop={e => {
+                                e.preventDefault();
+                                setDragOverKey(null);
+                                if (draggedId.current) {
+                                  mover.mutate({ id: draggedId.current, tecnico_id: t.id, fecha });
+                                  draggedId.current = null;
+                                }
+                              }}
+                            >
+                              <div className="space-y-1 min-h-[48px]">
+                                {celdaAsigs.map(a => (
+                                  <AsignacionCell
+                                    key={a.id}
+                                    asig={a}
+                                    onClick={() => setModal({ tecnico: t, fecha, asignacion: a })}
+                                    onDelete={() => eliminar.mutate(a.id)}
+                                    onDragStart={() => { draggedId.current = a.id; }}
+                                  />
+                                ))}
+                                <button
+                                  onClick={() => setModal({ tecnico: t, fecha })}
+                                  className="w-full text-center text-slate-300 hover:text-brand hover:bg-brand/5 rounded-md py-1 text-xs transition-colors opacity-0 group-hover:opacity-100"
+                                >
+                                  <Plus size={12} className="mx-auto" />
+                                </button>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

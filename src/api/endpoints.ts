@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Cliente, Instalacion, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion } from '../types';
+import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion } from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -82,6 +82,9 @@ export const checklists = {
 };
 
 export const planificacion = {
+  instalacionesSistema: {
+    list: () => api.get<InstalacionResumen[]>('/planificacion/instalaciones').then(r => r.data),
+  },
   provincias: {
     list: () => api.get<PlanProvincia[]>('/planificacion/provincias').then(r => r.data),
     create: (d: Partial<PlanProvincia>) => api.post<PlanProvincia>('/planificacion/provincias', d).then(r => r.data),
@@ -92,6 +95,7 @@ export const planificacion = {
     create: (d: Partial<PlanTecnico>) => api.post<PlanTecnico>('/planificacion/tecnicos', d).then(r => r.data),
     update: (id: string, d: Partial<PlanTecnico>) => api.patch<PlanTecnico>(`/planificacion/tecnicos/${id}`, d).then(r => r.data),
     remove: (id: string) => api.delete(`/planificacion/tecnicos/${id}`),
+    sincronizar: () => api.post<{ sincronizados: number; creados: number; reactivados: number }>('/planificacion/tecnicos/sincronizar').then(r => r.data),
   },
   clientes: {
     list: () => api.get<PlanCliente[]>('/planificacion/clientes').then(r => r.data),
@@ -104,6 +108,7 @@ export const planificacion = {
     create: (d: Partial<PlanObra>) => api.post<PlanObra>('/planificacion/obras', d).then(r => r.data),
     update: (id: string, d: Partial<PlanObra>) => api.patch<PlanObra>(`/planificacion/obras/${id}`, d).then(r => r.data),
     remove: (id: string) => api.delete(`/planificacion/obras/${id}`),
+    sincronizar: () => api.post<{ sincronizadas: number; creadas: number; reactivadas: number }>('/planificacion/obras/sincronizar').then(r => r.data),
   },
   asignaciones: {
     semana: (desde: string, hasta: string, provinciaId?: string) =>
