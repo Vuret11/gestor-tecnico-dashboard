@@ -12,6 +12,7 @@ import Informes from './pages/Informes';
 import Incidencias from './pages/Incidencias';
 import Checklists from './pages/Checklists';
 import Clientes from './pages/Clientes';
+import ClienteDetalle from './pages/ClienteDetalle';
 import Auditorias from './pages/Auditorias';
 import Planificacion from './pages/planificacion/Planificacion';
 
@@ -30,6 +31,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />
+              <Route path="/clientes/:id" element={<ClienteDetalle />} />
               <Route path="/instalaciones" element={<Instalaciones />} />
               <Route path="/tecnicos" element={<Tecnicos />} />
               <Route path="/visitas" element={<Visitas />} />
