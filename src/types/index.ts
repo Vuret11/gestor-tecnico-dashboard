@@ -26,6 +26,8 @@ export interface User {
   createdAt: string;
 }
 
+export type TipoInstalacion = 'fv' | 'rite' | 'otro';
+
 export interface Instalacion {
   id: string;
   nombre: string;
@@ -40,6 +42,7 @@ export interface Instalacion {
   latitud?: number;
   longitud?: number;
   notas?: string;
+  tipoInstalacion?: TipoInstalacion | null;
   activo: boolean;
   createdAt: string;
 }
@@ -125,6 +128,7 @@ export interface ChecklistPlantilla {
   id: string;
   nombre: string;
   descripcion?: string;
+  tipoInstalacion?: TipoInstalacion | null;
   activo: boolean;
   secciones: ChecklistSeccion[];
   createdAt: string;

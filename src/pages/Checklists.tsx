@@ -29,6 +29,7 @@ function NuevaPlantillaModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
+  const [tipoInstalacion, setTipoInstalacion] = useState<string>('');
   const [secciones, setSecciones] = useState<DraftSeccion[]>([makeSeccion()]);
 
   const mutation = useMutation({
@@ -55,6 +56,7 @@ function NuevaPlantillaModal({ onClose }: { onClose: () => void }) {
     mutation.mutate({
       nombre,
       descripcion: descripcion || undefined,
+      tipoInstalacion: (tipoInstalacion || undefined) as any,
       secciones: secciones.map((sec, si) => ({
         titulo: sec.titulo || `Sección ${si + 1}`,
         orden: si,
@@ -92,6 +94,19 @@ function NuevaPlantillaModal({ onClose }: { onClose: () => void }) {
               />
             </div>
             <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Tipo de instalación</label>
+              <select
+                value={tipoInstalacion}
+                onChange={e => setTipoInstalacion(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white"
+              >
+                <option value="">— Genérico (todos los tipos) —</option>
+                <option value="fv">Fotovoltaica (FV)</option>
+                <option value="rite">RITE / Aerotermia</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div className="col-span-2">
               <label className="text-xs font-medium text-slate-500 mb-1 block">Descripción</label>
               <input
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
@@ -213,7 +228,18 @@ function PlantillaDetalle({ plantilla }: { plantilla: ChecklistPlantilla }) {
           <ClipboardList size={18} className="text-white" />
         </div>
         <div>
-          <h3 className="font-semibold text-slate-800">{plantilla.nombre}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-slate-800">{plantilla.nombre}</h3>
+            {plantilla.tipoInstalacion && (
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                plantilla.tipoInstalacion === 'fv' ? 'bg-yellow-100 text-yellow-700' :
+                plantilla.tipoInstalacion === 'rite' ? 'bg-blue-100 text-blue-700' :
+                'bg-slate-100 text-slate-600'
+              }`}>
+                {plantilla.tipoInstalacion === 'fv' ? 'FV' : plantilla.tipoInstalacion === 'rite' ? 'RITE' : 'Otro'}
+              </span>
+            )}
+          </div>
           {plantilla.descripcion && <p className="text-xs text-slate-500">{plantilla.descripcion}</p>}
         </div>
         <span className="ml-auto text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">

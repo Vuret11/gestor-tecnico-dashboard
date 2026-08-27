@@ -17,6 +17,7 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
     provincia: item?.provincia ?? '',
     telefono: item?.telefono ?? '',
     notas: item?.notas ?? '',
+    tipoInstalacion: item?.tipoInstalacion ?? '' as string,
   });
 
   const save = useMutation({
@@ -88,6 +89,19 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
             <label className="block text-xs font-medium text-slate-600 mb-1">Teléfono</label>
             <input type="tel" value={form.telefono} onChange={set('telefono')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de instalación</label>
+            <select
+              value={form.tipoInstalacion}
+              onChange={e => setForm(f => ({ ...f, tipoInstalacion: e.target.value }))}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white"
+            >
+              <option value="">— Sin especificar —</option>
+              <option value="fv">Fotovoltaica (FV)</option>
+              <option value="rite">RITE / Aerotermia</option>
+              <option value="otro">Otro</option>
+            </select>
           </div>
           <div className="col-span-2">
             <label className="block text-xs font-medium text-slate-600 mb-1">Notas</label>
@@ -175,7 +189,18 @@ export default function Instalaciones() {
                         ? <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{inst.clienteData?.nombre ?? inst.cliente}</span>
                         : <span className="text-slate-400">—</span>}
                     </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{inst.nombre}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      <span>{inst.nombre}</span>
+                      {inst.tipoInstalacion && (
+                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${
+                          inst.tipoInstalacion === 'fv' ? 'bg-yellow-100 text-yellow-700' :
+                          inst.tipoInstalacion === 'rite' ? 'bg-blue-100 text-blue-700' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                          {inst.tipoInstalacion === 'fv' ? 'FV' : inst.tipoInstalacion === 'rite' ? 'RITE' : 'Otro'}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-slate-600">
                       <span className="flex items-center gap-1"><MapPin size={12} />{inst.ciudad}</span>
                     </td>
