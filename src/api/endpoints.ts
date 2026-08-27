@@ -12,6 +12,7 @@ export const users = {
     api.post<User>('/usuarios', data).then(r => r.data),
   update: (id: string, data: Partial<User>) =>
     api.patch<User>(`/usuarios/${id}`, data).then(r => r.data),
+  remove: (id: string) => api.delete(`/usuarios/${id}`),
 };
 
 export const clientes = {

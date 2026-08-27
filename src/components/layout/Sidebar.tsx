@@ -10,7 +10,7 @@ import clsx from 'clsx';
 const nav = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clientes', icon: UserCheck, label: 'Partners' },
-  { to: '/tecnicos', icon: Users, label: 'Técnicos' },
+  { to: '/tecnicos', icon: Users, label: 'Personal Oficina' },
   { to: '/visitas', icon: Building2, label: 'Instalaciones' },
   { to: '/informes', icon: FileText, label: 'Informes' },
   { to: '/incidencias', icon: AlertTriangle, label: 'Incidencias' },
