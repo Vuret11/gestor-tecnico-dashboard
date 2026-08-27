@@ -1,8 +1,15 @@
 import { useState, useMemo, useRef, Fragment, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { planificacion as api } from '../../api/endpoints';
-import type { PlanAsignacion, PlanTecnico, EstadoEspecial } from '../../types';
+import { planificacion as api, visitas as visitasApi } from '../../api/endpoints';
+import type { PlanAsignacion, PlanTecnico, EstadoEspecial, Visita } from '../../types';
 import { ChevronLeft, ChevronRight, Plus, X, AlertTriangle, Plane } from 'lucide-react';
+
+const TIPO_VISITA_LABELS: Record<string, string> = {
+  visita_tecnica_fv: 'V.T. FV',
+  visita_tecnica_aerotermia: 'V.T. Rite',
+  instalacion_nueva_fv: 'Inst. FV',
+  instalacion_nueva_aerotermia: 'Inst. Rite',
+};
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -296,6 +303,10 @@ export default function PlanSemanal() {
     queryKey: ['plan-semana', desde, hasta, provinciaId],
     queryFn: () => api.asignaciones.semana(desde, hasta, provinciaId || undefined),
   });
+  const { data: visitasSemana = [] } = useQuery({
+    queryKey: ['visitas-semana', desde, hasta],
+    queryFn: () => visitasApi.semana(desde, hasta),
+  });
   const { data: conflictos = [] } = useQuery({
     queryKey: ['plan-conflictos', desde, hasta],
     queryFn: () => api.asignaciones.conflictos(desde, hasta),
@@ -344,6 +355,28 @@ export default function PlanSemanal() {
     });
     return m;
   }, [asignaciones]);
+
+  // Mapa userId → planTecnicoId (para enlazar visitas con filas del grid)
+  const userIdToPlanTecnico = useMemo(() => {
+    const m = new Map<string, string>();
+    tecnicos.forEach(t => { if (t.user_id) m.set(t.user_id, t.id); });
+    return m;
+  }, [tecnicos]);
+
+  // Mapa: planTecnicoId → fecha → visitas
+  const mapaVisitas = useMemo(() => {
+    const m = new Map<string, Map<string, Visita[]>>();
+    visitasSemana.forEach(v => {
+      const ptId = userIdToPlanTecnico.get(v.tecnico_id);
+      if (!ptId) return;
+      const fecha = v.fechaProgramada.split('T')[0];
+      if (!m.has(ptId)) m.set(ptId, new Map());
+      const fm = m.get(ptId)!;
+      if (!fm.has(fecha)) fm.set(fecha, []);
+      fm.get(fecha)!.push(v);
+    });
+    return m;
+  }, [visitasSemana, userIdToPlanTecnico]);
 
   const semanaLabel = `${weekDays[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} — ${weekDays[6].toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
@@ -456,6 +489,7 @@ export default function PlanSemanal() {
                           const fecha = dateStr(d);
                           const cellKey = `${t.id}_${fecha}`;
                           const celdaAsigs = mapa.get(t.id)?.get(fecha) ?? [];
+                          const celdaVisitas = mapaVisitas.get(t.id)?.get(fecha) ?? [];
                           const esFinde = i >= 5;
                           const isDragOver = dragOverKey === cellKey;
                           return (
@@ -484,6 +518,13 @@ export default function PlanSemanal() {
                                     onDelete={() => eliminar.mutate(a.id)}
                                     onDragStart={() => { draggedId.current = a.id; }}
                                   />
+                                ))}
+                                {celdaVisitas.map(v => (
+                                  <div key={v.id} className="rounded-md px-2 py-1.5 text-xs bg-amber-50 border border-amber-200 hover:border-amber-400 transition-colors">
+                                    <p className="font-bold text-slate-900 truncate">{v.instalacion?.nombre ?? '—'}</p>
+                                    <p className="text-amber-700 truncate leading-tight">{TIPO_VISITA_LABELS[v.tipo] ?? v.tipo}</p>
+                                    {v.instalacion?.ciudad && <p className="text-slate-400 truncate leading-tight text-[10px]">{v.instalacion.ciudad}</p>}
+                                  </div>
                                 ))}
                                 <button
                                   onClick={() => setModal({ tecnico: t, fecha })}

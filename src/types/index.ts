@@ -171,6 +171,7 @@ export interface PlanTecnico {
   observaciones?: string;
   activo: boolean;
   viaja: boolean;
+  user_id?: string;
   createdAt: string;
 }
 
