@@ -25,7 +25,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    const socket = io(import.meta.env.VITE_API_URL?.replace('/api/v1', '') ?? 'http://localhost:3000', {
+    const rawUrl = import.meta.env.VITE_API_URL ?? '';
+    // Si es URL relativa (proxy dev), usamos el origen del navegador
+    const socketUrl = rawUrl.startsWith('http') ? rawUrl.replace('/api/v1', '') : window.location.origin;
+
+    const socket = io(socketUrl, {
       transports: ['websocket'],
     });
     socketRef.current = socket;
@@ -36,6 +40,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     socket.on('nueva-visita', (payload: VisitaNotificacion) => {
       setNotificaciones(prev => [payload, ...prev]);
+    });
+
+    socket.on('visita-cancelada', (payload: VisitaNotificacion) => {
+      setNotificaciones(prev => [{ ...payload, tipo: 'CANCELADA: ' + payload.tipo }, ...prev]);
+    });
+
+    socket.on('visita-actualizada', (payload: VisitaNotificacion) => {
+      setNotificaciones(prev => [{ ...payload, tipo: 'ACTUALIZADA: ' + payload.tipo }, ...prev]);
     });
 
     return () => {

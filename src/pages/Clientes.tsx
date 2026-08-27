@@ -4,8 +4,8 @@ import { clientes as api, instalaciones as instApi } from '../api/endpoints';
 import type { Cliente, Instalacion } from '../types';
 import { Plus, Pencil, Building2, X, ChevronRight, MapPin } from 'lucide-react';
 
-/* ── Modal crear/editar cliente ── */
-function ClienteModal({ item, onClose }: { item?: Cliente; onClose: () => void }) {
+/* ── Modal crear/editar partner ── */
+function PartnerModal({ item, onClose }: { item?: Cliente; onClose: () => void }) {
   const qc = useQueryClient();
   const [form, setForm] = useState({
     nombre: item?.nombre ?? '',
@@ -45,7 +45,7 @@ function ClienteModal({ item, onClose }: { item?: Cliente; onClose: () => void }
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-          <h2 className="font-semibold text-slate-900">{item ? 'Editar cliente' : 'Nuevo cliente'}</h2>
+          <h2 className="font-semibold text-slate-900">{item ? 'Editar partner' : 'Nuevo partner'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
         <div className="p-6 space-y-4">
@@ -94,7 +94,7 @@ function ClienteModal({ item, onClose }: { item?: Cliente; onClose: () => void }
   );
 }
 
-/* ── Modal crear instalación desde cliente ── */
+/* ── Modal crear instalación desde partner ── */
 function InstalacionModal({ cliente, onClose }: { cliente: Cliente; onClose: () => void }) {
   const qc = useQueryClient();
   const [form, setForm] = useState({
@@ -133,7 +133,7 @@ function InstalacionModal({ cliente, onClose }: { cliente: Cliente; onClose: () 
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
           <div>
             <h2 className="font-semibold text-slate-900">Nueva instalación</h2>
-            <p className="text-xs text-slate-500">Cliente: {cliente.nombre}</p>
+            <p className="text-xs text-slate-500">Partner: {cliente.nombre}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
@@ -174,6 +174,11 @@ function InstalacionModal({ cliente, onClose }: { cliente: Cliente; onClose: () 
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none" />
           </div>
         </div>
+        {save.isError && (
+          <div className="mx-6 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            {(save.error as any)?.response?.data?.message ?? (save.error as any)?.message ?? 'Error al guardar'}
+          </div>
+        )}
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">
             Cancelar
@@ -191,7 +196,7 @@ function InstalacionModal({ cliente, onClose }: { cliente: Cliente; onClose: () 
   );
 }
 
-/* ── Panel lateral: instalaciones del cliente ── */
+/* ── Panel lateral: instalaciones del partner ── */
 function InstalacionesPanel({
   cliente,
   onClose,
@@ -215,6 +220,9 @@ function InstalacionesPanel({
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-200 flex items-start justify-between">
           <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-brand bg-brand/10 px-2 py-0.5 rounded">Partner</span>
+            </div>
             <h2 className="font-semibold text-slate-900 text-base">{cliente.nombre}</h2>
             {cliente.nif && <p className="text-xs text-slate-500">{cliente.nif}</p>}
             <div className="flex gap-3 mt-1 text-xs text-slate-500">
@@ -282,7 +290,7 @@ function InstalacionesPanel({
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer notas */}
         {cliente.notas && (
           <div className="px-5 py-3 border-t border-slate-100 bg-slate-50">
             <p className="text-xs text-slate-500 font-medium mb-1">Notas</p>
@@ -315,14 +323,14 @@ export default function Clientes() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Clientes</h1>
-          <p className="text-sm text-slate-500">{data.length} clientes</p>
+          <h1 className="text-xl font-semibold text-slate-900">Partners</h1>
+          <p className="text-sm text-slate-500">{data.length} partners registrados</p>
         </div>
         <button
           onClick={() => setModal({ open: true })}
           className="flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg text-sm hover:bg-brand-dark"
         >
-          <Plus size={16} /> Nuevo cliente
+          <Plus size={16} /> Nuevo partner
         </button>
       </div>
 
@@ -331,12 +339,12 @@ export default function Clientes() {
       ) : data.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
           <Building2 size={40} className="mx-auto text-slate-200 mb-3" />
-          <p className="text-slate-500 font-medium">Sin clientes aún</p>
+          <p className="text-slate-500 font-medium">Sin partners aún</p>
           <button
             onClick={() => setModal({ open: true })}
             className="mt-3 text-sm text-brand hover:underline"
           >
-            Crear primer cliente
+            Crear primer partner
           </button>
         </div>
       ) : (
@@ -344,7 +352,7 @@ export default function Clientes() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {['Nombre', 'NIF / CIF', 'Teléfono', 'Email', 'Dirección', ''].map(h => (
+                {['Partner', 'NIF / CIF', 'Teléfono', 'Email', 'Dirección', ''].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{h}</th>
                 ))}
               </tr>
@@ -388,7 +396,7 @@ export default function Clientes() {
       )}
 
       {modal.open && (
-        <ClienteModal
+        <PartnerModal
           item={modal.item}
           onClose={() => setModal({ open: false })}
         />

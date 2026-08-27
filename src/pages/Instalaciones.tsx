@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { instalaciones as api } from '../api/endpoints';
-import type { Instalacion } from '../types';
+import { instalaciones as api, clientes as clientesApi } from '../api/endpoints';
+import type { Instalacion, Cliente } from '../types';
 import { Plus, Pencil, MapPin } from 'lucide-react';
 
 function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
   const qc = useQueryClient();
+  const { data: partners = [] } = useQuery({ queryKey: ['clientes'], queryFn: clientesApi.list });
+
   const [form, setForm] = useState({
     nombre: item?.nombre ?? '',
+    clienteId: item?.clienteId ?? '',
     cliente: item?.cliente ?? '',
     direccion: item?.direccion ?? '',
     ciudad: item?.ciudad ?? '',
@@ -17,12 +20,26 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
   });
 
   const save = useMutation({
-    mutationFn: () => item ? api.update(item.id, form) : api.create(form),
+    mutationFn: () => {
+      const data = Object.fromEntries(
+        Object.entries(form).filter(([, v]) => v !== ''),
+      ) as Partial<Instalacion>;
+      return item ? api.update(item.id, data) : api.create(data);
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['instalaciones'] }); onClose(); },
   });
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
+
+  function handlePartnerChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const selected = partners.find((p: Cliente) => p.id === e.target.value);
+    setForm(f => ({
+      ...f,
+      clienteId: selected?.id ?? '',
+      cliente: selected?.nombre ?? '',
+    }));
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -32,30 +49,64 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
         <div className="p-6 grid grid-cols-2 gap-4">
-          {[
-            ['nombre', 'Nombre', 'col-span-2'],
-            ['cliente', 'Cliente', 'col-span-2'],
-            ['direccion', 'Dirección', 'col-span-2'],
-            ['ciudad', 'Ciudad', ''],
-            ['provincia', 'Provincia', ''],
-            ['telefono', 'Teléfono', ''],
-          ].map(([k, label, cls]) => (
-            <div key={k} className={cls || 'col-span-1'}>
-              <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-              <input value={(form as any)[k]} onChange={set(k)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
-            </div>
-          ))}
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Nombre</label>
+            <input value={form.nombre} onChange={set('nombre')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
+
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Partner vinculado</label>
+            <select
+              value={form.clienteId}
+              onChange={handlePartnerChange}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white"
+            >
+              <option value="">— Sin partner —</option>
+              {partners.map((p: Cliente) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Dirección</label>
+            <input value={form.direccion} onChange={set('direccion')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Ciudad</label>
+            <input value={form.ciudad} onChange={set('ciudad')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Provincia</label>
+            <input value={form.provincia} onChange={set('provincia')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Teléfono</label>
+            <input type="tel" value={form.telefono} onChange={set('telefono')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
           <div className="col-span-2">
             <label className="block text-xs font-medium text-slate-600 mb-1">Notas</label>
             <textarea value={form.notas} onChange={set('notas')} rows={2}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none" />
           </div>
         </div>
+        {save.isError && (
+          <div className="mx-6 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            {(save.error as any)?.response?.data?.message ?? (save.error as any)?.message ?? 'Error al guardar'}
+          </div>
+        )}
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">Cancelar</button>
-          <button onClick={() => save.mutate()} disabled={save.isPending}
-            className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50">
+          <button
+            onClick={() => save.mutate()}
+            disabled={save.isPending || !form.nombre.trim()}
+            className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50"
+          >
             {save.isPending ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
@@ -73,7 +124,7 @@ export default function Instalaciones() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Instalaciones</h1>
-          <p className="text-sm text-slate-500">{data.length} instalaciones activas</p>
+          <p className="text-sm text-slate-500">{data.length} instalaciones</p>
         </div>
         <button onClick={() => setModal({ open: true })}
           className="flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg text-sm hover:bg-brand-dark">
@@ -88,16 +139,27 @@ export default function Instalaciones() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  {['Nombre', 'Cliente', 'Ciudad', 'Teléfono', ''].map(h => (
+                  {['Nombre', 'Partner', 'Ciudad', 'Teléfono', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
+                {data.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-slate-400 text-sm">
+                      Sin instalaciones registradas
+                    </td>
+                  </tr>
+                )}
                 {data.map(inst => (
                   <tr key={inst.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-900">{inst.nombre}</td>
-                    <td className="px-4 py-3 text-slate-600">{inst.cliente}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {inst.cliente
+                        ? <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{inst.cliente}</span>
+                        : <span className="text-slate-400">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-slate-600">
                       <span className="flex items-center gap-1"><MapPin size={12} />{inst.ciudad}</span>
                     </td>

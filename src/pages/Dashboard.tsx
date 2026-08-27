@@ -63,6 +63,7 @@ export default function Dashboard() {
 
   // Carga por técnico
   const cargaTecnicos = tecnicosActivos.map(t => ({
+    id: t.id,
     nombre: t.nombre.split(' ')[0],
     pendientes: todasVisitas.filter(v => v.tecnico_id === t.id && (v.estado === 'programada' || v.estado === 'en_curso')).length,
     completadas: todasVisitas.filter(v => v.tecnico_id === t.id && v.estado === 'completada').length,
@@ -227,7 +228,7 @@ export default function Dashboard() {
               {cargaTecnicos.length === 0
                 ? <p className="text-sm text-slate-400 text-center py-2">Sin técnicos</p>
                 : cargaTecnicos.map(t => (
-                  <div key={t.nombre}>
+                  <div key={t.id}>
                     <div className="flex justify-between text-xs text-slate-600 mb-1">
                       <span className="font-medium">{t.nombre}</span>
                       <span>{t.pendientes} pend. · {t.completadas} hechas</span>
