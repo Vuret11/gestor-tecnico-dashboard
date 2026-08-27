@@ -191,18 +191,23 @@ export default function ClienteDetalle() {
   const [editPartner, setEditPartner] = useState(false);
   const [instModal, setInstModal] = useState<{ open: boolean; item?: Instalacion }>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const eliminarInst = useMutation({
     mutationFn: (instId: string) => instApi.remove(instId),
     onSuccess: () => {
       setConfirmDelete(null);
+      setDeleteError(null);
       qc.invalidateQueries({ queryKey: ['instalaciones-cliente', id] });
       qc.invalidateQueries({ queryKey: ['instalaciones'] });
       qc.invalidateQueries({ queryKey: ['plan-obras'] });
       qc.invalidateQueries({ queryKey: ['plan-semana'] });
       qc.invalidateQueries({ queryKey: ['visitas-semana'] });
     },
-    onError: () => setConfirmDelete(null),
+    onError: (err: any) => {
+      setConfirmDelete(null);
+      setDeleteError(err?.response?.data?.message ?? err?.message ?? 'Error al eliminar la instalación');
+    },
   });
 
   const { data: cliente, isLoading: loadingCliente } = useQuery({
@@ -395,6 +400,11 @@ export default function ClienteDetalle() {
               </li>
             ))}
           </ul>
+        )}
+        {deleteError && (
+          <div className="mt-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            {deleteError}
+          </div>
         )}
       </div>
 
