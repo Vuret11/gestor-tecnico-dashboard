@@ -11,7 +11,6 @@ import Visitas from './pages/Visitas';
 import Informes from './pages/Informes';
 import Incidencias from './pages/Incidencias';
 import Checklists from './pages/Checklists';
-import Calendario from './pages/Calendario';
 import Clientes from './pages/Clientes';
 import Auditorias from './pages/Auditorias';
 import Planificacion from './pages/planificacion/Planificacion';
@@ -39,7 +38,6 @@ export default function App() {
               <Route path="/checklists" element={<Checklists />} />
               <Route path="/auditorias" element={<Auditorias />} />
               <Route path="/planificacion" element={<Planificacion />} />
-              <Route path="/calendario" element={<Calendario />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

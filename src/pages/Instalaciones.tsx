@@ -70,12 +70,12 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
           </div>
 
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-600 mb-1">Dirección</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Dirección {!item && <span className="text-red-500">*</span>}</label>
             <input value={form.direccion} onChange={set('direccion')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Ciudad</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Ciudad {!item && <span className="text-red-500">*</span>}</label>
             <input value={form.ciudad} onChange={set('ciudad')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
@@ -96,15 +96,15 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
           </div>
         </div>
         {save.isError && (
-          <div className="mx-6 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-            {(save.error as any)?.response?.data?.message ?? (save.error as any)?.message ?? 'Error al guardar'}
+          <div className="mx-6 mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-medium">
+            Error: {(save.error as any)?.response?.data?.message ?? (save.error as any)?.message ?? 'No se pudo guardar. Revisa los campos.'}
           </div>
         )}
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">Cancelar</button>
           <button
             onClick={() => save.mutate()}
-            disabled={save.isPending || !form.nombre.trim()}
+            disabled={save.isPending || !form.nombre.trim() || (!item && (!form.direccion.trim() || !form.ciudad.trim()))}
             className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50"
           >
             {save.isPending ? 'Guardando...' : 'Guardar'}

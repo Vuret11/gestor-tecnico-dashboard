@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, Fragment } from 'react';
+import { useState, useMemo, useRef, Fragment, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { planificacion as api } from '../../api/endpoints';
 import type { PlanAsignacion, PlanTecnico, EstadoEspecial } from '../../types';
@@ -98,6 +98,7 @@ function AsignacionModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  // obras se usa solo para el reverse-lookup obra_id → instalacion_id al editar
   const { data: obras = [] } = useQuery({ queryKey: ['plan-obras'], queryFn: () => api.obras.list() });
   const { data: instalaciones = [] } = useQuery({ queryKey: ['plan-instalaciones-sistema'], queryFn: () => api.instalacionesSistema.list() });
 
@@ -105,40 +106,79 @@ function AsignacionModal({
   const modoInicial = asignacion?.estadoEspecial ? 'estado' : 'obra';
 
   const [modo, setModo] = useState<'obra' | 'estado'>(modoInicial);
-  const [obraId, setObraId] = useState(asignacion?.obra_id ?? '');
+  // Trackea instalacion_id directamente; el PlanObra se crea automáticamente si no existe
+  const [instId, setInstId] = useState(asignacion?.obra?.instalacion_id ?? '');
   const [estadoEspecial, setEstadoEspecial] = useState<EstadoEspecial | ''>(asignacion?.estadoEspecial ?? '');
   const [viaja, setViaja] = useState(asignacion?.viaja ?? false);
   const [observaciones, setObs] = useState(asignacion?.observaciones ?? '');
 
+  // Al editar, si la obra no tiene instalacion_id en el objeto (carga tardía), buscarlo en obras
+  useEffect(() => {
+    if (esEdicion && !instId && asignacion?.obra_id && obras.length > 0) {
+      const obra = obras.find(o => o.id === asignacion.obra_id);
+      if (obra?.instalacion_id) setInstId(obra.instalacion_id);
+    }
+  }, [obras]);
+
+  // Mapa instalacion_id → obra_id ya existente
+  const obraByInst = useMemo(() => {
+    const m = new Map<string, string>();
+    obras.forEach(o => { if (o.instalacion_id) m.set(o.instalacion_id, o.id); });
+    return m;
+  }, [obras]);
+
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ['plan-semana'] });
     qc.invalidateQueries({ queryKey: ['plan-conflictos'] });
+    qc.invalidateQueries({ queryKey: ['plan-obras'] });
+  };
+
+  // Devuelve el obra_id; si no existe PlanObra para esta instalación, lo crea
+  const resolverObraId = async (): Promise<string | undefined> => {
+    if (modo !== 'obra' || !instId) return undefined;
+    const existing = obraByInst.get(instId);
+    if (existing) return existing;
+    const inst = instalaciones.find(i => i.id === instId);
+    const nueva = await api.obras.create({
+      instalacion_id: instId,
+      nombre: inst?.nombre ?? '',
+      numeroObra: instId.slice(0, 8).toUpperCase(),
+      tipoTrabajo: 'otro',
+      estado: 'pendiente',
+    });
+    return nueva.id;
   };
 
   const crear = useMutation({
-    mutationFn: () => api.asignaciones.create({
-      tecnico_id: tecnico.id,
-      fecha,
-      obra_id: modo === 'obra' ? obraId : undefined,
-      estadoEspecial: modo === 'estado' ? (estadoEspecial as EstadoEspecial) : null,
-      viaja,
-      observaciones,
-    }),
+    mutationFn: async () => {
+      const obraId = await resolverObraId();
+      return api.asignaciones.create({
+        tecnico_id: tecnico.id,
+        fecha,
+        obra_id: obraId,
+        estadoEspecial: modo === 'estado' ? (estadoEspecial as EstadoEspecial) : null,
+        viaja,
+        observaciones,
+      });
+    },
     onSuccess: () => { invalidar(); onClose(); },
   });
 
   const editar = useMutation({
-    mutationFn: () => api.asignaciones.update(asignacion!.id, {
-      obra_id: modo === 'obra' ? obraId : undefined,
-      estadoEspecial: modo === 'estado' ? (estadoEspecial as EstadoEspecial) : null,
-      viaja,
-      observaciones,
-    }),
+    mutationFn: async () => {
+      const obraId = await resolverObraId();
+      return api.asignaciones.update(asignacion!.id, {
+        obra_id: obraId,
+        estadoEspecial: modo === 'estado' ? (estadoEspecial as EstadoEspecial) : null,
+        viaja,
+        observaciones,
+      });
+    },
     onSuccess: () => { invalidar(); onClose(); },
   });
 
   const mutation = esEdicion ? editar : crear;
-  const disabled = mutation.isPending || (modo === 'obra' ? !obraId : !estadoEspecial);
+  const disabled = mutation.isPending || (modo === 'obra' ? !instId : !estadoEspecial);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -156,7 +196,7 @@ function AsignacionModal({
             {(['obra', 'estado'] as const).map(m => (
               <button key={m} onClick={() => setModo(m)}
                 className={`flex-1 py-2 capitalize ${modo === m ? 'bg-brand text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
-                {m === 'obra' ? 'Obra' : 'Estado especial'}
+                {m === 'obra' ? 'Instalación' : 'Estado especial'}
               </button>
             ))}
           </div>
@@ -165,14 +205,12 @@ function AsignacionModal({
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Instalación *</label>
-                <select value={obraId} onChange={e => setObraId(e.target.value)}
+                <select value={instId} onChange={e => setInstId(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
                   <option value="">— Seleccionar instalación —</option>
-                  {obras.map(o => (
-                    <option key={o.id} value={o.id}>
-                      {o.instalacion
-                        ? `${o.instalacion.nombre}${o.instalacion.ciudad ? ` · ${o.instalacion.ciudad}` : ''}`
-                        : `${o.numeroObra} · ${o.nombre}`}
+                  {instalaciones.map(i => (
+                    <option key={i.id} value={i.id}>
+                      {i.nombre}{i.ciudad ? ` · ${i.ciudad}` : ''}
                     </option>
                   ))}
                 </select>

@@ -3,17 +3,13 @@ import PlanSemanal from './PlanSemanal';
 import PlanMensual from './PlanMensual';
 import PlanDashboard from './PlanDashboard';
 import PlanTecnicos from './PlanTecnicos';
-import PlanObras from './PlanObras';
-import PlanImportar from './PlanImportar';
-import { CalendarDays, CalendarRange, LayoutDashboard, HardHat, FolderOpen, Upload } from 'lucide-react';
+import { CalendarDays, CalendarRange, LayoutDashboard, HardHat } from 'lucide-react';
 
 const TABS = [
   { key: 'semanal',   label: 'Semanal',    icon: CalendarDays },
   { key: 'mensual',   label: 'Mensual',    icon: CalendarRange },
   { key: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard },
   { key: 'tecnicos',  label: 'Técnicos',   icon: HardHat },
-  { key: 'obras',     label: 'Obras',      icon: FolderOpen },
-  { key: 'importar',  label: 'Importar',   icon: Upload },
 ] as const;
 
 type Tab = typeof TABS[number]['key'];
@@ -49,8 +45,6 @@ export default function Planificacion() {
         {tab === 'mensual'   && <PlanMensual />}
         {tab === 'dashboard' && <PlanDashboard />}
         {tab === 'tecnicos'  && <PlanTecnicos />}
-        {tab === 'obras'     && <PlanObras />}
-        {tab === 'importar'  && <PlanImportar />}
       </div>
     </div>
   );

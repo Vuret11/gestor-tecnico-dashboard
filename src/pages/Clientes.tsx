@@ -1,8 +1,17 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { clientes as api, instalaciones as instApi } from '../api/endpoints';
-import type { Cliente, Instalacion } from '../types';
-import { Plus, Pencil, Building2, X, ChevronRight, MapPin } from 'lucide-react';
+import { clientes as api, instalaciones as instApi, planificacion as planApi } from '../api/endpoints';
+import type { Cliente, Instalacion, TipoTrabajo, EstadoObra } from '../types';
+import { Plus, Pencil, Building2, X, ChevronRight, MapPin, Briefcase } from 'lucide-react';
+
+const TIPO_LABELS: Record<TipoTrabajo, string> = {
+  instalacion_fv: 'Inst. FV',
+  instalacion_aerotermia: 'Rite',
+  mantenimiento: 'Mantenimiento',
+  incidencia: 'Incidencia',
+  visita_tecnica: 'Visita técnica',
+  otro: 'Otro',
+};
 
 /* ── Modal crear/editar partner ── */
 function PartnerModal({ item, onClose }: { item?: Cliente; onClose: () => void }) {
@@ -190,6 +199,121 @@ function InstalacionModal({ cliente, onClose }: { cliente: Cliente; onClose: () 
   );
 }
 
+/* ── Modal nueva obra desde partner ── */
+function ObraModal({ instalaciones, onClose }: {
+  instalaciones: Instalacion[];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const { data: provincias = [] } = useQuery({
+    queryKey: ['plan-provincias'],
+    queryFn: planApi.provincias.list,
+  });
+
+  const [form, setForm] = useState({
+    instalacion_id: instalaciones.length === 1 ? instalaciones[0].id : '',
+    nombre: instalaciones.length === 1 ? instalaciones[0].nombre : '',
+    tipoTrabajo: 'instalacion_fv' as TipoTrabajo,
+    estado: 'pendiente' as EstadoObra,
+    provincia_id: '',
+    fechaPrevista: '',
+    observaciones: '',
+  });
+
+  const save = useMutation({
+    mutationFn: () => {
+      const data = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''));
+      return planApi.obras.create(data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plan-obras'] });
+      onClose();
+    },
+  });
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const onSelectInst = (id: string) => {
+    const inst = instalaciones.find(i => i.id === id);
+    setForm(f => ({ ...f, instalacion_id: id, nombre: inst?.nombre ?? f.nombre }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70] p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+        <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center">
+          <h2 className="font-semibold text-slate-900">Nueva obra</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+        </div>
+        <div className="p-5 grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Instalación *</label>
+            <select value={form.instalacion_id} onChange={e => onSelectInst(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
+              <option value="">— Seleccionar —</option>
+              {instalaciones.map(i => (
+                <option key={i.id} value={i.id}>{i.nombre}{i.ciudad ? ` · ${i.ciudad}` : ''}</option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Nombre / Descripción *</label>
+            <input value={form.nombre} onChange={set('nombre')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+            <select value={form.tipoTrabajo} onChange={set('tipoTrabajo')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
+              {Object.entries(TIPO_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Estado</label>
+            <select value={form.estado} onChange={set('estado')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
+              {(['pendiente','planificada','confirmada','en_curso','realizada','cancelada','reprogramada'] as EstadoObra[]).map(k => (
+                <option key={k} value={k}>{k.replace('_', ' ')}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Fecha prevista</label>
+            <input type="date" value={form.fechaPrevista} onChange={set('fechaPrevista')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Provincia</label>
+            <select value={form.provincia_id} onChange={set('provincia_id')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
+              <option value="">— Sin provincia —</option>
+              {provincias.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Observaciones</label>
+            <textarea value={form.observaciones} onChange={set('observaciones')} rows={2}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none" />
+          </div>
+        </div>
+        {save.isError && (
+          <div className="mx-5 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            {(save.error as any)?.response?.data?.message ?? 'Error al guardar'}
+          </div>
+        )}
+        <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">Cancelar</button>
+          <button onClick={() => save.mutate()} disabled={save.isPending || !form.nombre.trim()}
+            className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50">
+            {save.isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Panel lateral: instalaciones del partner ── */
 function InstalacionesPanel({
   cliente,
@@ -201,6 +325,7 @@ function InstalacionesPanel({
   onEdit: () => void;
 }) {
   const [showInstModal, setShowInstModal] = useState(false);
+  const [showObraModal, setShowObraModal] = useState(false);
 
   const { data: insts = [], isLoading } = useQuery({
     queryKey: ['instalaciones-cliente', cliente.id],
@@ -280,6 +405,21 @@ function InstalacionesPanel({
           )}
         </div>
 
+        {/* Obras */}
+        <div className="px-5 py-3 flex items-center justify-between border-b border-slate-100 border-t border-t-slate-200 mt-1">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+            <Briefcase size={12} /> Obras
+          </span>
+          <button
+            onClick={() => setShowObraModal(true)}
+            disabled={insts.length === 0}
+            title={insts.length === 0 ? 'Crea primero una instalación' : 'Nueva obra'}
+            className="flex items-center gap-1.5 text-xs bg-brand text-white px-3 py-1.5 rounded-lg hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Plus size={12} /> Nueva obra
+          </button>
+        </div>
+
         {/* Footer notas */}
         {cliente.notas && (
           <div className="px-5 py-3 border-t border-slate-100 bg-slate-50">
@@ -293,6 +433,13 @@ function InstalacionesPanel({
         <InstalacionModal
           cliente={cliente}
           onClose={() => setShowInstModal(false)}
+        />
+      )}
+
+      {showObraModal && (
+        <ObraModal
+          instalaciones={insts}
+          onClose={() => setShowObraModal(false)}
         />
       )}
     </>
