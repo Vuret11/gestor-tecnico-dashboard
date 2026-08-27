@@ -16,9 +16,9 @@ import type { TipoVisita } from '../types';
 
 const TIPO_LABELS: Record<TipoVisita, string> = {
   visita_tecnica_fv: 'V.T. FV',
-  visita_tecnica_aerotermia: 'V.T. Aerotermia',
+  visita_tecnica_aerotermia: 'V.T. Rite',
   instalacion_nueva_fv: 'Inst. FV',
-  instalacion_nueva_aerotermia: 'Inst. Aerotermia',
+  instalacion_nueva_aerotermia: 'Inst. Rite',
 };
 const TIPO_COLORS = ['#3b82f6', '#06b6d4', '#f59e0b', '#f97316'];
 

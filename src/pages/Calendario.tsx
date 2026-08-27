@@ -38,9 +38,9 @@ const TIPO_COLORS: Record<TipoVisita, string> = {
 
 const TIPO_LABELS: Record<TipoVisita, string> = {
   visita_tecnica_fv: 'Visita Técnica FV',
-  visita_tecnica_aerotermia: 'Visita Técnica Aerotermia',
+  visita_tecnica_aerotermia: 'Visita Técnica Rite',
   instalacion_nueva_fv: 'Instalación Nueva FV',
-  instalacion_nueva_aerotermia: 'Instalación Nueva Aerotermia',
+  instalacion_nueva_aerotermia: 'Instalación Nueva Rite',
 };
 
 const ESTADO_DOT: Record<string, string> = {
@@ -158,9 +158,9 @@ function NuevaVisitaModal({
             <select value={form.tipo} onChange={set('tipo')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
               <option value="visita_tecnica_fv">Visita Técnica FV</option>
-              <option value="visita_tecnica_aerotermia">Visita Técnica Aerotermia</option>
+              <option value="visita_tecnica_aerotermia">Visita Técnica Rite</option>
               <option value="instalacion_nueva_fv">Instalación Nueva FV</option>
-              <option value="instalacion_nueva_aerotermia">Instalación Nueva Aerotermia</option>
+              <option value="instalacion_nueva_aerotermia">Instalación Nueva Rite</option>
             </select>
           </div>
 

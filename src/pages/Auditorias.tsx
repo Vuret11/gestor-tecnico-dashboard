@@ -18,9 +18,9 @@ const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sáb
 const TIPOS = [
   { key: 'todos', label: 'Todos los tipos' },
   { key: 'visita_tecnica_fv', label: 'V.T. Fotovoltaica' },
-  { key: 'visita_tecnica_aerotermia', label: 'V.T. Aerotermia' },
+  { key: 'visita_tecnica_aerotermia', label: 'V.T. Rite' },
   { key: 'instalacion_nueva_fv', label: 'Inst. FV' },
-  { key: 'instalacion_nueva_aerotermia', label: 'Inst. Aerotermia' },
+  { key: 'instalacion_nueva_aerotermia', label: 'Inst. Rite' },
 ];
 
 type Periodo = 'semana' | 'mes' | 'año';
@@ -41,9 +41,9 @@ function buildFila(label: string, v: Visita[], inc: Incidencia[]) {
     Completadas: v.filter(x => x.estado === 'completada').length,
     Canceladas: v.filter(x => x.estado === 'cancelada').length,
     'V.T. FV': v.filter(x => x.tipo === 'visita_tecnica_fv').length,
-    'V.T. Aerotermia': v.filter(x => x.tipo === 'visita_tecnica_aerotermia').length,
+    'V.T. Rite': v.filter(x => x.tipo === 'visita_tecnica_aerotermia').length,
     'Inst. FV': v.filter(x => x.tipo === 'instalacion_nueva_fv').length,
-    'Inst. Aerotermia': v.filter(x => x.tipo === 'instalacion_nueva_aerotermia').length,
+    'Inst. Rite': v.filter(x => x.tipo === 'instalacion_nueva_aerotermia').length,
     Incidencias: inc.length,
     'Inc. críticas': inc.filter(x => x.prioridad === 'critica' || x.prioridad === 'alta').length,
   };
@@ -214,9 +214,9 @@ export default function Auditorias() {
           Completadas: v.filter(x => x.estado === 'completada').length,
           Canceladas: v.filter(x => x.estado === 'cancelada').length,
           'V.T. FV': v.filter(x => x.tipo === 'visita_tecnica_fv').length,
-          'V.T. Aerotermia': v.filter(x => x.tipo === 'visita_tecnica_aerotermia').length,
+          'V.T. Rite': v.filter(x => x.tipo === 'visita_tecnica_aerotermia').length,
           'Inst. FV': v.filter(x => x.tipo === 'instalacion_nueva_fv').length,
-          'Inst. Aerotermia': v.filter(x => x.tipo === 'instalacion_nueva_aerotermia').length,
+          'Inst. Rite': v.filter(x => x.tipo === 'instalacion_nueva_aerotermia').length,
           '% completado': v.length ? `${Math.round(v.filter(x => x.estado === 'completada').length / v.length * 100)}%` : '—',
         };
       })
@@ -299,10 +299,10 @@ export default function Auditorias() {
           sub={`${completadas} completadas (${totalVisitas ? Math.round(completadas / totalVisitas * 100) : 0}%)`}
           icon={CalendarCheck} color="bg-blue-500" />
         <KpiCard label="Instalaciones nuevas" value={instNuevas}
-          sub="FV + Aerotermia"
+          sub="FV + Rite"
           icon={Zap} color="bg-amber-500" />
         <KpiCard label="Visitas técnicas" value={totalVisitas - instNuevas}
-          sub="FV + Aerotermia"
+          sub="FV + Rite"
           icon={Wrench} color="bg-cyan-500" />
         <KpiCard label="Incidencias" value={totalInc}
           sub={`${incResueltas} resueltas`}
@@ -366,9 +366,9 @@ export default function Auditorias() {
                       <td className="px-3 py-3 text-green-600">{t['Completadas'] || '—'}</td>
                       <td className="px-3 py-3 text-slate-400">{t['Canceladas'] || '—'}</td>
                       <td className="px-3 py-3 text-blue-600">{t['V.T. FV'] || '—'}</td>
-                      <td className="px-3 py-3 text-cyan-600">{t['V.T. Aerotermia'] || '—'}</td>
+                      <td className="px-3 py-3 text-cyan-600">{t['V.T. Rite'] || '—'}</td>
                       <td className="px-3 py-3 text-amber-600">{t['Inst. FV'] || '—'}</td>
-                      <td className="px-3 py-3 text-orange-600">{t['Inst. Aerotermia'] || '—'}</td>
+                      <td className="px-3 py-3 text-orange-600">{t['Inst. Rite'] || '—'}</td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden min-w-[60px]">
@@ -388,9 +388,9 @@ export default function Auditorias() {
                   <td className="px-3 py-2.5 text-green-600">{tecnicoRows.reduce((s, t) => s + t['Completadas'], 0)}</td>
                   <td className="px-3 py-2.5 text-slate-400">{tecnicoRows.reduce((s, t) => s + t['Canceladas'], 0) || '—'}</td>
                   <td className="px-3 py-2.5 text-blue-600">{tecnicoRows.reduce((s, t) => s + t['V.T. FV'], 0) || '—'}</td>
-                  <td className="px-3 py-2.5 text-cyan-600">{tecnicoRows.reduce((s, t) => s + t['V.T. Aerotermia'], 0) || '—'}</td>
+                  <td className="px-3 py-2.5 text-cyan-600">{tecnicoRows.reduce((s, t) => s + t['V.T. Rite'], 0) || '—'}</td>
                   <td className="px-3 py-2.5 text-amber-600">{tecnicoRows.reduce((s, t) => s + t['Inst. FV'], 0) || '—'}</td>
-                  <td className="px-3 py-2.5 text-orange-600">{tecnicoRows.reduce((s, t) => s + t['Inst. Aerotermia'], 0) || '—'}</td>
+                  <td className="px-3 py-2.5 text-orange-600">{tecnicoRows.reduce((s, t) => s + t['Inst. Rite'], 0) || '—'}</td>
                   <td className="px-3 py-2.5" />
                 </tr>
               </tfoot>
@@ -422,9 +422,9 @@ export default function Auditorias() {
                   <td className="px-3 py-2.5 text-green-600">{f['Completadas'] || '—'}</td>
                   <td className="px-3 py-2.5 text-slate-400">{f['Canceladas'] || '—'}</td>
                   <td className="px-3 py-2.5 text-blue-600">{f['V.T. FV'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-cyan-600">{f['V.T. Aerotermia'] || '—'}</td>
+                  <td className="px-3 py-2.5 text-cyan-600">{f['V.T. Rite'] || '—'}</td>
                   <td className="px-3 py-2.5 text-amber-600">{f['Inst. FV'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-orange-600">{f['Inst. Aerotermia'] || '—'}</td>
+                  <td className="px-3 py-2.5 text-orange-600">{f['Inst. Rite'] || '—'}</td>
                   <td className="px-3 py-2.5 text-red-500">{f['Incidencias'] || '—'}</td>
                   <td className="px-3 py-2.5 text-red-700 font-medium">{f['Inc. críticas'] || '—'}</td>
                 </tr>
@@ -434,7 +434,7 @@ export default function Auditorias() {
           <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
             <tr>
               <td className="px-3 py-2.5 text-slate-700">TOTAL</td>
-              {(['Total visitas', 'Completadas', 'Canceladas', 'V.T. FV', 'V.T. Aerotermia', 'Inst. FV', 'Inst. Aerotermia', 'Incidencias', 'Inc. críticas'] as const).map(k => (
+              {(['Total visitas', 'Completadas', 'Canceladas', 'V.T. FV', 'V.T. Rite', 'Inst. FV', 'Inst. Rite', 'Incidencias', 'Inc. críticas'] as const).map(k => (
                 <td key={k} className="px-3 py-2.5 text-slate-900">
                   {filas.reduce((s, f) => s + (Number(f[k]) || 0), 0) || '—'}
                 </td>

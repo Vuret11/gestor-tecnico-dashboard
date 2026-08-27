@@ -10,9 +10,9 @@ import { InformePDFButton } from '../components/InformePDF';
 
 const TIPO_LABELS: Record<TipoVisita, string> = {
   visita_tecnica_fv: 'Visita Técnica Fotovoltaica',
-  visita_tecnica_aerotermia: 'Visita Técnica Aerotermia',
+  visita_tecnica_aerotermia: 'Visita Técnica Rite',
   instalacion_nueva_fv: 'Instalación Nueva Fotovoltaica',
-  instalacion_nueva_aerotermia: 'Instalación Nueva Aerotermia',
+  instalacion_nueva_aerotermia: 'Instalación Nueva Rite',
 };
 
 // ─── Vista de documento ───────────────────────────────────────────────────────
