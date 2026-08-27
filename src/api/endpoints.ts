@@ -34,6 +34,7 @@ export const instalaciones = {
     api.post<Instalacion>('/instalaciones', data).then(r => r.data),
   update: (id: string, data: Partial<Instalacion>) =>
     api.patch<Instalacion>(`/instalaciones/${id}`, data).then(r => r.data),
+  remove: (id: string) => api.delete(`/instalaciones/${id}`),
 };
 
 export const visitas = {

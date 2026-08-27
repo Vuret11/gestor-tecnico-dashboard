@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientes as api, instalaciones as instApi } from '../api/endpoints';
 import type { Cliente, Instalacion } from '../types';
-import { ArrowLeft, Plus, Pencil, MapPin, Building2, Phone, Mail, FileText } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, MapPin, Building2, Phone, Mail, FileText } from 'lucide-react';
 
 /* ── Modal editar partner ── */
 function PartnerModal({ item, onClose }: { item: Cliente; onClose: () => void }) {
@@ -191,6 +191,14 @@ export default function ClienteDetalle() {
   const [editPartner, setEditPartner] = useState(false);
   const [instModal, setInstModal] = useState<{ open: boolean; item?: Instalacion }>({ open: false });
 
+  const eliminarInst = useMutation({
+    mutationFn: (instId: string) => instApi.remove(instId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['instalaciones-cliente', id] });
+      qc.invalidateQueries({ queryKey: ['instalaciones'] });
+    },
+  });
+
   const { data: cliente, isLoading: loadingCliente } = useQuery({
     queryKey: ['cliente', id],
     queryFn: () => api.get(id!),
@@ -337,12 +345,24 @@ export default function ClienteDetalle() {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setInstModal({ open: true, item: inst })}
-                  className="text-slate-300 hover:text-brand p-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                >
-                  <Pencil size={13} />
-                </button>
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                  <button
+                    onClick={() => setInstModal({ open: true, item: inst })}
+                    className="text-slate-300 hover:text-brand p-1"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`¿Eliminar "${inst.nombre}"? Esta acción no se puede deshacer.`)) {
+                        eliminarInst.mutate(inst.id);
+                      }
+                    }}
+                    className="text-slate-300 hover:text-red-500 p-1"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
