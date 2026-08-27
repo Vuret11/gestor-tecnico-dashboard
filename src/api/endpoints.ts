@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Cliente, Instalacion, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto } from '../types';
+import type { AuthResponse, User, Cliente, Instalacion, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion } from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -79,6 +79,43 @@ export const checklists = {
     api.patch<VisitaChecklist>(`/checklists/visita/${visitaId}`, data).then(r => r.data),
   completar: (visitaId: string) =>
     api.patch<VisitaChecklist>(`/checklists/visita/${visitaId}/completar`, {}).then(r => r.data),
+};
+
+export const planificacion = {
+  provincias: {
+    list: () => api.get<PlanProvincia[]>('/planificacion/provincias').then(r => r.data),
+    create: (d: Partial<PlanProvincia>) => api.post<PlanProvincia>('/planificacion/provincias', d).then(r => r.data),
+    update: (id: string, d: Partial<PlanProvincia>) => api.patch<PlanProvincia>(`/planificacion/provincias/${id}`, d).then(r => r.data),
+  },
+  tecnicos: {
+    list: (provinciaId?: string) => api.get<PlanTecnico[]>('/planificacion/tecnicos', { params: { provinciaId } }).then(r => r.data),
+    create: (d: Partial<PlanTecnico>) => api.post<PlanTecnico>('/planificacion/tecnicos', d).then(r => r.data),
+    update: (id: string, d: Partial<PlanTecnico>) => api.patch<PlanTecnico>(`/planificacion/tecnicos/${id}`, d).then(r => r.data),
+    remove: (id: string) => api.delete(`/planificacion/tecnicos/${id}`),
+  },
+  clientes: {
+    list: () => api.get<PlanCliente[]>('/planificacion/clientes').then(r => r.data),
+    create: (d: Partial<PlanCliente>) => api.post<PlanCliente>('/planificacion/clientes', d).then(r => r.data),
+    update: (id: string, d: Partial<PlanCliente>) => api.patch<PlanCliente>(`/planificacion/clientes/${id}`, d).then(r => r.data),
+    remove: (id: string) => api.delete(`/planificacion/clientes/${id}`),
+  },
+  obras: {
+    list: (provinciaId?: string, clienteId?: string) => api.get<PlanObra[]>('/planificacion/obras', { params: { provinciaId, clienteId } }).then(r => r.data),
+    create: (d: Partial<PlanObra>) => api.post<PlanObra>('/planificacion/obras', d).then(r => r.data),
+    update: (id: string, d: Partial<PlanObra>) => api.patch<PlanObra>(`/planificacion/obras/${id}`, d).then(r => r.data),
+    remove: (id: string) => api.delete(`/planificacion/obras/${id}`),
+  },
+  asignaciones: {
+    semana: (desde: string, hasta: string, provinciaId?: string) =>
+      api.get<PlanAsignacion[]>('/planificacion/asignaciones/semana', { params: { desde, hasta, provinciaId } }).then(r => r.data),
+    mes: (year: number, month: number, provinciaId?: string) =>
+      api.get<PlanAsignacion[]>('/planificacion/asignaciones/mes', { params: { year, month, provinciaId } }).then(r => r.data),
+    conflictos: (desde: string, hasta: string) =>
+      api.get('/planificacion/asignaciones/conflictos', { params: { desde, hasta } }).then(r => r.data),
+    create: (d: Partial<PlanAsignacion>) => api.post<PlanAsignacion>('/planificacion/asignaciones', d).then(r => r.data),
+    update: (id: string, d: Partial<PlanAsignacion>) => api.patch<PlanAsignacion>(`/planificacion/asignaciones/${id}`, d).then(r => r.data),
+    remove: (id: string) => api.delete(`/planificacion/asignaciones/${id}`),
+  },
 };
 
 export const incidencias = {

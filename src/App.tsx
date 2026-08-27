@@ -14,6 +14,9 @@ import Checklists from './pages/Checklists';
 import Calendario from './pages/Calendario';
 import Clientes from './pages/Clientes';
 import Auditorias from './pages/Auditorias';
+import PlanSemanal from './pages/planificacion/PlanSemanal';
+import PlanTecnicos from './pages/planificacion/PlanTecnicos';
+import PlanObras from './pages/planificacion/PlanObras';
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -37,6 +40,9 @@ export default function App() {
               <Route path="/incidencias" element={<Incidencias />} />
               <Route path="/checklists" element={<Checklists />} />
               <Route path="/auditorias" element={<Auditorias />} />
+              <Route path="/planificacion" element={<PlanSemanal />} />
+              <Route path="/planificacion/tecnicos" element={<PlanTecnicos />} />
+              <Route path="/planificacion/obras" element={<PlanObras />} />
               <Route path="/calendario" element={<Calendario />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

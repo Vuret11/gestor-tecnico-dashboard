@@ -146,6 +146,82 @@ export interface VisitaChecklist {
   createdAt: string;
 }
 
+// ── Planificación ─────────────────────────────────────────────────────────────
+export interface PlanProvincia {
+  id: string;
+  nombre: string;
+  color?: string;
+  activo: boolean;
+  createdAt: string;
+}
+
+export type TipoTecnico = 'propio' | 'externo' | 'subcontrata';
+
+export interface PlanTecnico {
+  id: string;
+  nombre: string;
+  matricula?: string;
+  tipo: TipoTecnico;
+  provincia?: PlanProvincia;
+  provincia_id?: string;
+  telefono?: string;
+  email?: string;
+  observaciones?: string;
+  activo: boolean;
+  viaja: boolean;
+  createdAt: string;
+}
+
+export interface PlanCliente {
+  id: string;
+  nombre: string;
+  contacto?: string;
+  telefono?: string;
+  email?: string;
+  observaciones?: string;
+  activo: boolean;
+  createdAt: string;
+}
+
+export type EstadoObra = 'pendiente' | 'planificada' | 'confirmada' | 'en_curso' | 'realizada' | 'cancelada' | 'reprogramada';
+export type TipoTrabajo = 'instalacion_fv' | 'instalacion_aerotermia' | 'mantenimiento' | 'incidencia' | 'visita_tecnica' | 'otro';
+
+export interface PlanObra {
+  id: string;
+  numeroObra: string;
+  nombre: string;
+  cliente?: PlanCliente;
+  cliente_id?: string;
+  provincia?: PlanProvincia;
+  provincia_id?: string;
+  direccion?: string;
+  ciudad?: string;
+  tipoTrabajo: TipoTrabajo;
+  estado: EstadoObra;
+  fechaPrevista?: string;
+  fechaRealizada?: string;
+  observaciones?: string;
+  activo: boolean;
+  createdAt: string;
+}
+
+export type EstadoEspecial = 'vacaciones' | 'baja' | 'comp_horas' | 'libre' | 'fiesta_nacional' | 'medico' | 'sancion' | 'reconocimiento' | 'otros';
+
+export interface PlanAsignacion {
+  id: string;
+  tecnico: PlanTecnico;
+  tecnico_id: string;
+  obra?: PlanObra;
+  obra_id?: string;
+  fecha: string;
+  provinciatrabajo?: PlanProvincia;
+  provincia_trabajo_id?: string;
+  estadoEspecial?: EstadoEspecial | null;
+  viaja: boolean;
+  observaciones?: string;
+  createdAt: string;
+}
+
 export interface AuthResponse {
   access_token: string;
   user: Pick<User, 'id' | 'nombre' | 'email' | 'rol'>;
