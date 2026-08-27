@@ -96,6 +96,7 @@ export const planificacion = {
     update: (id: string, d: Partial<PlanTecnico>) => api.patch<PlanTecnico>(`/planificacion/tecnicos/${id}`, d).then(r => r.data),
     remove: (id: string) => api.delete(`/planificacion/tecnicos/${id}`),
     sincronizar: () => api.post<{ sincronizados: number; creados: number; reactivados: number }>('/planificacion/tecnicos/sincronizar').then(r => r.data),
+    crearUsuarios: () => api.post<{ creados: number; omitidos: number; usuarios: { nombre: string; email: string; password: string }[] }>('/planificacion/tecnicos/crear-usuarios').then(r => r.data),
   },
   clientes: {
     list: () => api.get<PlanCliente[]>('/planificacion/clientes').then(r => r.data),

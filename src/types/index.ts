@@ -31,6 +31,7 @@ export interface Instalacion {
   nombre: string;
   cliente: string;
   clienteId?: string;
+  clienteData?: Cliente;
   direccion: string;
   ciudad: string;
   provincia?: string;
@@ -55,6 +56,7 @@ export interface Visita {
   tipo: TipoVisita;
   estado: EstadoVisita;
   notas?: string;
+  modalidad?: 'nueva' | 'reforma';
   createdAt: string;
   updatedAt: string;
 }

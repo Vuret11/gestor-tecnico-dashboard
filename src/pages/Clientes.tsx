@@ -9,10 +9,7 @@ function PartnerModal({ item, onClose }: { item?: Cliente; onClose: () => void }
   const qc = useQueryClient();
   const [form, setForm] = useState({
     nombre: item?.nombre ?? '',
-    nif: item?.nif ?? '',
-    telefono: item?.telefono ?? '',
     email: item?.email ?? '',
-    direccion: item?.direccion ?? '',
     notas: item?.notas ?? '',
   });
 
@@ -35,10 +32,7 @@ function PartnerModal({ item, onClose }: { item?: Cliente; onClose: () => void }
 
   const fields: [keyof typeof form, string, string][] = [
     ['nombre', 'Nombre / Razón social', 'text'],
-    ['nif', 'NIF / CIF', 'text'],
-    ['telefono', 'Teléfono', 'tel'],
     ['email', 'Email', 'email'],
-    ['direccion', 'Dirección', 'text'],
   ];
 
   return (
@@ -224,11 +218,7 @@ function InstalacionesPanel({
               <span className="text-[10px] font-semibold uppercase tracking-widest text-brand bg-brand/10 px-2 py-0.5 rounded">Partner</span>
             </div>
             <h2 className="font-semibold text-slate-900 text-base">{cliente.nombre}</h2>
-            {cliente.nif && <p className="text-xs text-slate-500">{cliente.nif}</p>}
-            <div className="flex gap-3 mt-1 text-xs text-slate-500">
-              {cliente.telefono && <span>{cliente.telefono}</span>}
-              {cliente.email && <span>{cliente.email}</span>}
-            </div>
+            {cliente.email && <p className="text-xs text-slate-500">{cliente.email}</p>}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -352,7 +342,7 @@ export default function Clientes() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {['Partner', 'NIF / CIF', 'Teléfono', 'Email', 'Dirección', ''].map(h => (
+                {['Partner', 'Email', ''].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{h}</th>
                 ))}
               </tr>
@@ -368,10 +358,7 @@ export default function Clientes() {
                       {c.nombre}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-slate-500">{c.nif || '—'}</td>
-                  <td className="px-4 py-3 text-slate-500">{c.telefono || '—'}</td>
                   <td className="px-4 py-3 text-slate-500">{c.email || '—'}</td>
-                  <td className="px-4 py-3 text-slate-500 max-w-[160px] truncate">{c.direccion || '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button

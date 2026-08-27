@@ -15,7 +15,7 @@ const ESTADO_COLOR: Record<EstadoObra, string> = {
 };
 
 const TIPO_LABELS: Record<TipoTrabajo, string> = {
-  instalacion_fv: 'Inst. FV', instalacion_aerotermia: 'Inst. Aerotermia',
+  instalacion_fv: 'Inst. FV', instalacion_aerotermia: 'Rite',
   mantenimiento: 'Mantenimiento', incidencia: 'Incidencia',
   visita_tecnica: 'Visita técnica', otro: 'Otro',
 };

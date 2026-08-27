@@ -7,9 +7,9 @@ import type { TipoVisita, EstadoVisita, Visita } from '../types';
 
 const TIPO_LABELS: Record<TipoVisita, string> = {
   visita_tecnica_fv: 'V.T. Fotovoltaica',
-  visita_tecnica_aerotermia: 'V.T. Aerotermia',
+  visita_tecnica_aerotermia: 'V.T. Rite',
   instalacion_nueva_fv: 'Inst. Nueva FV',
-  instalacion_nueva_aerotermia: 'Inst. Nueva Aerotermia',
+  instalacion_nueva_aerotermia: 'Inst. Nueva Rite',
 };
 
 const TIPO_STYLES: Record<TipoVisita, string> = {
@@ -51,6 +51,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
       : '',
     tipo: (editing?.tipo ?? 'visita_tecnica_fv') as TipoVisita,
     notas: editing?.notas ?? '',
+    modalidad: editing?.modalidad ?? '',
   });
   const [busqInst, setBusqInst] = useState('');
   const [adjuntos, setAdjuntos] = useState<File[]>([]);
@@ -73,10 +74,16 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     ]);
   };
 
+  const formData = () => {
+    const d: any = { ...form };
+    if (!d.modalidad) delete d.modalidad;
+    return d;
+  };
+
   const save = useMutation({
     mutationFn: () => editing
-      ? api.update(editing.id, form as any)
-      : api.create(form as any),
+      ? api.update(editing.id, formData())
+      : api.create(formData()),
     onSuccess: async (visita) => {
       if (!editing && adjuntos.length > 0) {
         setUploading(true);
@@ -128,6 +135,26 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
               ))}
             </div>
           </div>
+
+          {/* Nueva / Reforma — solo para Rite (aerotermia) */}
+          {form.tipo === 'visita_tecnica_aerotermia' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Nueva o Reforma</label>
+              <div className="flex gap-2">
+                {(['nueva', 'reforma'] as const).map(m => (
+                  <button key={m} type="button"
+                    onClick={() => setForm(f => ({ ...f, modalidad: f.modalidad === m ? '' : m }))}
+                    className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors capitalize ${
+                      form.modalidad === m
+                        ? 'bg-cyan-600 text-white border-cyan-600'
+                        : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'
+                    }`}>
+                    {m.charAt(0).toUpperCase() + m.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Instalación */}
           <div>
@@ -347,6 +374,12 @@ function VisitaPanel({ visita, onClose }: { visita: Visita; onClose: () => void 
               })}
             </p>
           </div>
+          {visita.modalidad && (
+            <div>
+              <p className="text-slate-400 mb-0.5">Modalidad</p>
+              <p className="font-medium text-slate-700 capitalize">{visita.modalidad}</p>
+            </div>
+          )}
           {visita.notas && (
             <div className="col-span-2">
               <p className="text-slate-400 mb-0.5">Notas</p>
@@ -679,7 +712,16 @@ export default function Visitas() {
                       <p className="font-medium text-slate-900">{v.instalacion?.nombre ?? '—'}</p>
                       <p className="text-xs text-slate-400">{v.instalacion?.cliente}</p>
                     </td>
-                    <td className="px-4 py-3"><TipoBadge tipo={v.tipo} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <TipoBadge tipo={v.tipo} />
+                        {v.modalidad && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700 uppercase tracking-wide">
+                            {v.modalidad}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-slate-600">{v.tecnico?.nombre ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                       {new Date(v.fechaProgramada).toLocaleString('es-ES', {

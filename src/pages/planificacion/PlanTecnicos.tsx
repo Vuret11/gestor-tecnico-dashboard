@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { planificacion as api } from '../../api/endpoints';
 import type { PlanTecnico, PlanProvincia, TipoTecnico } from '../../types';
-import { Plus, Pencil, Trash2, Plane, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Plane, RefreshCw, UserPlus, Copy, Check } from 'lucide-react';
 
 const TIPO_LABELS: Record<TipoTecnico, string> = {
   propio: 'Propio', externo: 'Externo', subcontrata: 'Subcontrata',
@@ -110,11 +110,78 @@ function TecnicoModal({ item, provincias, onClose }: { item?: PlanTecnico; provi
   );
 }
 
+function CredencialesModal({ usuarios, onClose }: {
+  usuarios: { nombre: string; email: string; password: string }[];
+  onClose: () => void;
+}) {
+  const [copiado, setCopiado] = useState<string | null>(null);
+
+  const copiar = (texto: string, key: string) => {
+    navigator.clipboard.writeText(texto);
+    setCopiado(key);
+    setTimeout(() => setCopiado(null), 1500);
+  };
+
+  const copiarTodo = () => {
+    const texto = usuarios.map(u => `${u.nombre}\nEmail: ${u.email}\nClave: ${u.password}`).join('\n\n');
+    copiar(texto, 'all');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+          <div>
+            <h2 className="font-semibold text-slate-900">Usuarios creados</h2>
+            <p className="text-xs text-slate-500">{usuarios.length} cuentas nuevas — guarda estas credenciales</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+        </div>
+        <div className="p-4 max-h-[60vh] overflow-y-auto space-y-2">
+          {usuarios.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-6">Todos los técnicos ya tienen cuenta asignada.</p>
+          ) : usuarios.map((u, i) => (
+            <div key={i} className="bg-slate-50 rounded-lg px-4 py-3 border border-slate-200">
+              <p className="font-medium text-slate-900 text-sm mb-1">{u.nombre}</p>
+              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-1 text-xs text-slate-600">
+                <span className="text-slate-400">Email</span>
+                <span className="font-mono">{u.email}</span>
+                <button onClick={() => copiar(u.email, `email-${i}`)} className="text-slate-300 hover:text-brand">
+                  {copiado === `email-${i}` ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                </button>
+                <span className="text-slate-400">Clave</span>
+                <span className="font-mono">{u.password}</span>
+                <button onClick={() => copiar(u.password, `pw-${i}`)} className="text-slate-300 hover:text-brand">
+                  {copiado === `pw-${i}` ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center">
+          {usuarios.length > 0 && (
+            <button onClick={copiarTodo}
+              className="flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50">
+              {copiado === 'all' ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+              Copiar todo
+            </button>
+          )}
+          <button onClick={onClose}
+            className="ml-auto px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PlanTecnicos() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<{ open: boolean; item?: PlanTecnico }>({ open: false });
   const [filtroProv, setFiltroProv] = useState('');
   const [syncMsg, setSyncMsg] = useState('');
+  const [credenciales, setCredenciales] = useState<{ nombre: string; email: string; password: string }[] | null>(null);
 
   const sincronizar = useMutation({
     mutationFn: () => api.tecnicos.sincronizar(),
@@ -122,6 +189,14 @@ export default function PlanTecnicos() {
       qc.invalidateQueries({ queryKey: ['plan-tecnicos'] });
       setSyncMsg(`${data.creados} nuevo${data.creados !== 1 ? 's' : ''}, ${data.reactivados} reactivado${data.reactivados !== 1 ? 's' : ''}`);
       setTimeout(() => setSyncMsg(''), 4000);
+    },
+  });
+
+  const crearUsuarios = useMutation({
+    mutationFn: () => api.tecnicos.crearUsuarios(),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['plan-tecnicos'] });
+      setCredenciales(data.usuarios);
     },
   });
 
@@ -165,6 +240,15 @@ export default function PlanTecnicos() {
             <RefreshCw size={16} className={sincronizar.isPending ? 'animate-spin' : ''} />
             Sincronizar
           </button>
+          <button
+            onClick={() => crearUsuarios.mutate()}
+            disabled={crearUsuarios.isPending}
+            title="Crear cuentas de acceso para técnicos sin usuario"
+            className="flex items-center gap-2 border border-brand/40 text-brand px-4 py-2 rounded-lg text-sm hover:bg-brand/5 disabled:opacity-50"
+          >
+            <UserPlus size={16} className={crearUsuarios.isPending ? 'animate-pulse' : ''} />
+            Crear usuarios
+          </button>
           {syncMsg && (
             <span className="text-xs text-green-600 font-medium">{syncMsg}</span>
           )}
@@ -202,6 +286,9 @@ export default function PlanTecnicos() {
 
       {modal.open && (
         <TecnicoModal item={modal.item} provincias={provincias} onClose={() => setModal({ open: false })} />
+      )}
+      {credenciales !== null && (
+        <CredencialesModal usuarios={credenciales} onClose={() => setCredenciales(null)} />
       )}
     </div>
   );

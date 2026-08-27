@@ -139,7 +139,7 @@ export default function Instalaciones() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  {['Nombre', 'Partner', 'Ciudad', 'Teléfono', ''].map(h => (
+                  {['Partner', 'Nombre', 'Ciudad', 'Teléfono', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{h}</th>
                   ))}
                 </tr>
@@ -154,12 +154,12 @@ export default function Instalaciones() {
                 )}
                 {data.map(inst => (
                   <tr key={inst.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{inst.nombre}</td>
                     <td className="px-4 py-3 text-slate-600">
-                      {inst.cliente
-                        ? <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{inst.cliente}</span>
+                      {inst.clienteData?.nombre ?? inst.cliente
+                        ? <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{inst.clienteData?.nombre ?? inst.cliente}</span>
                         : <span className="text-slate-400">—</span>}
                     </td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{inst.nombre}</td>
                     <td className="px-4 py-3 text-slate-600">
                       <span className="flex items-center gap-1"><MapPin size={12} />{inst.ciudad}</span>
                     </td>
