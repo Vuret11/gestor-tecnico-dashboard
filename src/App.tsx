@@ -13,6 +13,7 @@ import Incidencias from './pages/Incidencias';
 import Checklists from './pages/Checklists';
 import Calendario from './pages/Calendario';
 import Clientes from './pages/Clientes';
+import Auditorias from './pages/Auditorias';
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="/informes" element={<Informes />} />
               <Route path="/incidencias" element={<Incidencias />} />
               <Route path="/checklists" element={<Checklists />} />
+              <Route path="/auditorias" element={<Auditorias />} />
               <Route path="/calendario" element={<Calendario />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
