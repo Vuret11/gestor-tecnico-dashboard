@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { visitas as visitasApi, incidencias as incidenciasApi } from '../api/endpoints';
+import { visitas as visitasApi, incidencias as incidenciasApi, users as usersApi } from '../api/endpoints';
 import type { Visita, Incidencia } from '../types';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Download, ChevronLeft, ChevronRight, CalendarCheck, AlertTriangle, Zap, Wrench } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, CalendarCheck, AlertTriangle, Zap, Wrench, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AuditoriaPDFButton } from '../components/AuditoriaPDF';
 
@@ -49,10 +49,10 @@ function buildFila(label: string, v: Visita[], inc: Incidencia[]) {
   };
 }
 
-function exportExcel(filas: object[], titulo: string) {
-  const ws = XLSX.utils.json_to_sheet(filas);
+function exportExcel(filas: object[], filasTecnicos: object[], titulo: string) {
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Auditoría');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Desglose por período');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filasTecnicos), 'Técnicos');
   XLSX.writeFile(wb, `auditoria_${titulo.replace(/[\s/]/g, '_')}.xlsx`);
 }
 
@@ -80,6 +80,7 @@ export default function Auditorias() {
 
   const { data: visitas = [] } = useQuery({ queryKey: ['visitas'], queryFn: visitasApi.list });
   const { data: incidencias = [] } = useQuery({ queryKey: ['incidencias'], queryFn: incidenciasApi.list });
+  const { data: usuarios = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
 
   // Rango de fechas según período
   const { desde, hasta, titulo, subtitulo } = useMemo(() => {
@@ -201,6 +202,28 @@ export default function Auditorias() {
 
   const tipoLabel = TIPOS.find(t => t.key === tipoFiltro)?.label ?? 'Todos';
 
+  // Técnicos activos con visitas en el período
+  const tecnicoRows = useMemo(() => {
+    const tecnicos = usuarios.filter(u => u.rol === 'tecnico' && u.activo);
+    return tecnicos
+      .map(t => {
+        const v = visitasFiltradas.filter(x => x.tecnico_id === t.id);
+        return {
+          Técnico: t.nombre,
+          Total: v.length,
+          Completadas: v.filter(x => x.estado === 'completada').length,
+          Canceladas: v.filter(x => x.estado === 'cancelada').length,
+          'V.T. FV': v.filter(x => x.tipo === 'visita_tecnica_fv').length,
+          'V.T. Aerotermia': v.filter(x => x.tipo === 'visita_tecnica_aerotermia').length,
+          'Inst. FV': v.filter(x => x.tipo === 'instalacion_nueva_fv').length,
+          'Inst. Aerotermia': v.filter(x => x.tipo === 'instalacion_nueva_aerotermia').length,
+          '% completado': v.length ? `${Math.round(v.filter(x => x.estado === 'completada').length / v.length * 100)}%` : '—',
+        };
+      })
+      .filter(r => r.Total > 0)
+      .sort((a, b) => b.Total - a.Total);
+  }, [usuarios, visitasFiltradas]);
+
   const kpisForPDF = [
     { label: 'Total visitas', value: totalVisitas, sub: `${completadas} completadas` },
     { label: 'Instalaciones nuevas', value: instNuevas },
@@ -254,7 +277,7 @@ export default function Auditorias() {
 
           {/* Exportar */}
           <button
-            onClick={() => exportExcel(filas, titulo)}
+            onClick={() => exportExcel(filas, tecnicoRows, titulo)}
             className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
           >
             <Download size={15} /> Excel
@@ -265,6 +288,7 @@ export default function Auditorias() {
             tipoLabel={tipoLabel}
             filas={filas}
             kpis={kpisForPDF}
+            tecnicoFilas={tecnicoRows}
           />
         </div>
       </div>
@@ -306,6 +330,73 @@ export default function Auditorias() {
           </div>
         </div>
       )}
+
+      {/* Tabla técnicos */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+          <Users size={16} className="text-slate-400" />
+          <h2 className="font-medium text-slate-900">Rendimiento por técnico</h2>
+          <span className="ml-auto text-xs text-slate-400">{tecnicoRows.length} técnicos con actividad</span>
+        </div>
+        {tecnicoRows.length === 0
+          ? <p className="px-5 py-8 text-sm text-slate-400 text-center">Sin visitas en este período</p>
+          : (
+            <table className="w-full text-xs min-w-[700px]">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  {['Técnico', 'Total', 'Complet.', 'Cancel.', 'V.T. FV', 'V.T. Aero', 'Inst. FV', 'Inst. Aero', '% Completado'].map(h => (
+                    <th key={h} className="px-3 py-2.5 text-left font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {tecnicoRows.map((t, i) => {
+                  const pct = t.Total ? Math.round(t['Completadas'] / t.Total * 100) : 0;
+                  return (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="px-3 py-3 font-medium text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-brand text-[10px] font-bold">{t.Técnico[0]}</span>
+                          </div>
+                          {t.Técnico}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 font-semibold text-slate-900">{t.Total}</td>
+                      <td className="px-3 py-3 text-green-600">{t['Completadas'] || '—'}</td>
+                      <td className="px-3 py-3 text-slate-400">{t['Canceladas'] || '—'}</td>
+                      <td className="px-3 py-3 text-blue-600">{t['V.T. FV'] || '—'}</td>
+                      <td className="px-3 py-3 text-cyan-600">{t['V.T. Aerotermia'] || '—'}</td>
+                      <td className="px-3 py-3 text-amber-600">{t['Inst. FV'] || '—'}</td>
+                      <td className="px-3 py-3 text-orange-600">{t['Inst. Aerotermia'] || '—'}</td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden min-w-[60px]">
+                            <div className="h-full bg-brand rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-slate-700 font-medium w-8 text-right">{pct}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
+                <tr>
+                  <td className="px-3 py-2.5 text-slate-700">TOTAL</td>
+                  <td className="px-3 py-2.5">{tecnicoRows.reduce((s, t) => s + t.Total, 0)}</td>
+                  <td className="px-3 py-2.5 text-green-600">{tecnicoRows.reduce((s, t) => s + t['Completadas'], 0)}</td>
+                  <td className="px-3 py-2.5 text-slate-400">{tecnicoRows.reduce((s, t) => s + t['Canceladas'], 0) || '—'}</td>
+                  <td className="px-3 py-2.5 text-blue-600">{tecnicoRows.reduce((s, t) => s + t['V.T. FV'], 0) || '—'}</td>
+                  <td className="px-3 py-2.5 text-cyan-600">{tecnicoRows.reduce((s, t) => s + t['V.T. Aerotermia'], 0) || '—'}</td>
+                  <td className="px-3 py-2.5 text-amber-600">{tecnicoRows.reduce((s, t) => s + t['Inst. FV'], 0) || '—'}</td>
+                  <td className="px-3 py-2.5 text-orange-600">{tecnicoRows.reduce((s, t) => s + t['Inst. Aerotermia'], 0) || '—'}</td>
+                  <td className="px-3 py-2.5" />
+                </tr>
+              </tfoot>
+            </table>
+          )}
+      </div>
 
       {/* Tabla desglose */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">

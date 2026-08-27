@@ -39,9 +39,10 @@ interface Props {
   tipoLabel: string;
   filas: Fila[];
   kpis: { label: string; value: string | number; sub?: string }[];
+  tecnicoFilas?: Fila[];
 }
 
-function AuditoriaPDFDoc({ titulo, subtitulo, tipoLabel, filas, kpis }: Props) {
+function AuditoriaPDFDoc({ titulo, subtitulo, tipoLabel, filas, kpis, tecnicoFilas }: Props) {
   const cols = filas.length > 0 ? Object.keys(filas[0]) : [];
   const totales: Record<string, number> = {};
   cols.forEach(c => {
@@ -95,6 +96,30 @@ function AuditoriaPDFDoc({ titulo, subtitulo, tipoLabel, filas, kpis }: Props) {
             ))}
           </View>
         </View>
+
+        {/* Técnicos */}
+        {tecnicoFilas && tecnicoFilas.length > 0 && (() => {
+          const tCols = Object.keys(tecnicoFilas[0]);
+          return (
+            <View>
+              <Text style={{ ...s.sectionTitle, marginTop: 20 }}>Rendimiento por técnico</Text>
+              <View style={s.table}>
+                <View style={s.thead}>
+                  {tCols.map(c => <Text key={c} style={s.th}>{c}</Text>)}
+                </View>
+                {tecnicoFilas.map((f, i) => (
+                  <View key={i} style={i % 2 === 0 ? s.tr : s.trAlt}>
+                    {tCols.map(c => (
+                      <Text key={c} style={c === 'Técnico' ? s.tdBold : s.td}>
+                        {f[c] === 0 ? '—' : String(f[c])}
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        })()}
 
         <Text style={s.footer}>
           Documento generado el {new Date().toLocaleDateString('es-ES')} · Gestor Técnico HomeServe Solar
