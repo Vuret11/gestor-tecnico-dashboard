@@ -69,6 +69,8 @@ export const fotos = {
 
 export const checklists = {
   plantillas: () => api.get<ChecklistPlantilla[]>('/checklists/plantillas').then(r => r.data),
+  plantillasByTipo: (tipo: string) =>
+    api.get<ChecklistPlantilla[]>(`/checklists/plantillas/by-tipo/${tipo}`).then(r => r.data),
   plantilla: (id: string) => api.get<ChecklistPlantilla>(`/checklists/plantillas/${id}`).then(r => r.data),
   crearPlantilla: (data: Partial<ChecklistPlantilla>) =>
     api.post<ChecklistPlantilla>('/checklists/plantillas', data).then(r => r.data),

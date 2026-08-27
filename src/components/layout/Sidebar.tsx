@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Building2, Users,
+  LayoutDashboard, Building2, Users, Wrench,
   FileText, AlertTriangle, LogOut, ClipboardList, UserCheck, ShieldCheck,
   HardHat,
 } from 'lucide-react';
@@ -11,7 +11,8 @@ const nav = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clientes', icon: UserCheck, label: 'Partners' },
   { to: '/tecnicos', icon: Users, label: 'Personal Oficina' },
-  { to: '/visitas', icon: Building2, label: 'Instalaciones' },
+  { to: '/instalaciones', icon: Building2, label: 'Instalaciones' },
+  { to: '/visitas', icon: Wrench, label: 'Visitas' },
   { to: '/informes', icon: FileText, label: 'Informes' },
   { to: '/incidencias', icon: AlertTriangle, label: 'Incidencias' },
   { to: '/checklists', icon: ClipboardList, label: 'Checklists' },

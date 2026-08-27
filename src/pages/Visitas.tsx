@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi } from '../api/endpoints';
+import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi, checklists as checklistsApi } from '../api/endpoints';
 import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2, Pencil, AlertTriangle } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import type { TipoVisita, EstadoVisita, Visita } from '../types';
@@ -52,6 +52,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     tipo: (editing?.tipo ?? 'visita_tecnica_fv') as TipoVisita,
     notas: editing?.notas ?? '',
     modalidad: editing?.modalidad ?? '',
+    plantillaId: '',
   });
   const [busqInst, setBusqInst] = useState('');
   const [adjuntos, setAdjuntos] = useState<File[]>([]);
@@ -75,7 +76,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
   };
 
   const formData = () => {
-    const d: any = { ...form };
+    const { plantillaId: _, ...rest } = form;
+    const d: any = { ...rest };
     if (!d.modalidad) delete d.modalidad;
     return d;
   };
@@ -85,6 +87,9 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
       ? api.update(editing.id, formData())
       : api.create(formData()),
     onSuccess: async (visita) => {
+      if (!editing && form.plantillaId) {
+        try { await checklistsApi.asignar(visita.id, form.plantillaId); } catch { /* non-fatal */ }
+      }
       if (!editing && adjuntos.length > 0) {
         setUploading(true);
         try {
@@ -108,6 +113,13 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     setForm(f => ({ ...f, [k]: e.target.value }));
 
   const instSel = insts.find(i => i.id === form.instalacion_id);
+  const tipoInst = instSel?.tipoInstalacion ?? null;
+
+  const { data: plantillasFiltradas = [] } = useQuery({
+    queryKey: ['plantillas-by-tipo', tipoInst ?? 'all'],
+    queryFn: () => tipoInst ? checklistsApi.plantillasByTipo(tipoInst) : checklistsApi.plantillas(),
+  });
+
   const busy = save.isPending || uploading;
 
   return (
@@ -165,7 +177,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
                 placeholder="Buscar instalación o cliente..."
                 className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
             </div>
-            <select value={form.instalacion_id} onChange={set('instalacion_id')} size={4}
+            <select value={form.instalacion_id} onChange={e => setForm(f => ({ ...f, instalacion_id: e.target.value, plantillaId: '' }))} size={4}
               className="w-full border border-slate-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
               <option value="">— Seleccionar —</option>
               {instsFiltradas.map(i => (
@@ -174,6 +186,37 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
             </select>
             {instSel && <p className="text-xs text-brand mt-1">✓ {instSel.nombre} — {instSel.ciudad}</p>}
           </div>
+
+          {/* Plantilla de checklist — solo al crear */}
+          {!editing && plantillasFiltradas.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Plantilla de checklist
+                {tipoInst && (
+                  <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${
+                    tipoInst === 'fv' ? 'bg-yellow-100 text-yellow-700' :
+                    tipoInst === 'rite' ? 'bg-blue-100 text-blue-700' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    {tipoInst === 'fv' ? 'FV' : tipoInst === 'rite' ? 'RITE' : 'Otro'}
+                  </span>
+                )}
+              </label>
+              <select
+                value={form.plantillaId}
+                onChange={e => setForm(f => ({ ...f, plantillaId: e.target.value }))}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+              >
+                <option value="">— Sin checklist —</option>
+                {plantillasFiltradas.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                    {p.tipoInstalacion ? ` · ${p.tipoInstalacion.toUpperCase()}` : ' · genérico'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Técnico */}
           <div>
