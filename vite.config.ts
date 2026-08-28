@@ -9,7 +9,7 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: true,
     proxy: {
-      '/api': 'http://localhost:3000',
+      '/api': 'https://gestor-tecnico-vdih.onrender.com',
     },
   },
   optimizeDeps: {
