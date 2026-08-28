@@ -5,7 +5,7 @@ import type { Visita, Incidencia, VisitaArticulo } from '../types';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Download, ChevronLeft, ChevronRight, CalendarCheck, AlertTriangle, Zap, Wrench, Users, Package, Clock } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, CalendarCheck, AlertTriangle, Zap, Wrench, Users, Package, Clock, BarChart2, TrendingUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AuditoriaPDFButton } from '../components/AuditoriaPDF';
 
@@ -24,7 +24,7 @@ const TIPOS = [
 ];
 
 type Periodo = 'semana' | 'mes' | 'año';
-type Vista = 'actividad' | 'kpis' | 'inventario';
+type Vista = 'actividad' | 'kpis' | 'inventario' | 'crm';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getWeekStart(d: Date): Date {
@@ -87,6 +87,33 @@ function exportHistorial(historial: VisitaArticulo[], titulo: string) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Historial Inventario');
   XLSX.writeFile(wb, `inventario_historial_${titulo.replace(/[\s/]/g, '_')}.xlsx`);
+}
+
+function exportCRM(porModelo: any[], porPeriodo: any[], porTecnico: any[], titulo: string) {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(porModelo.map(r => ({
+    Categoría: r.categoria,
+    Modelo: r.nombre,
+    Referencia: r.referencia || '—',
+    'Unidades instaladas': Math.round(r.cantidad * 1000) / 1000,
+    'Nº instalaciones': r.instalaciones,
+    'Coste total (€)': r.coste.toFixed(2),
+  }))), 'Por modelo');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(porPeriodo.map(r => ({
+    Período: r.label,
+    'Paneles (ud)': r.paneles,
+    'Inversores (ud)': r.inversores,
+    'Otros (ud)': r.otros,
+    'Coste total (€)': r.coste.toFixed(2),
+  }))), 'Evolución temporal');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(porTecnico.map(r => ({
+    Técnico: r.nombre,
+    'Paneles (ud)': r.paneles,
+    'Inversores (ud)': r.inversores,
+    'Otros (ud)': r.otros,
+    'Coste total (€)': r.coste.toFixed(2),
+  }))), 'Por técnico');
+  XLSX.writeFile(wb, `crm_materiales_${titulo.replace(/[\s/]/g, '_')}.xlsx`);
 }
 
 // ── Componente KPI ────────────────────────────────────────────────────────────
@@ -158,7 +185,7 @@ export default function Auditorias() {
   const { data: historial = [], isFetching: historialLoading } = useQuery({
     queryKey: ['inventario-historial', desde.toISOString(), hasta.toISOString()],
     queryFn: () => inventarioApi.historial(desde.toISOString(), hasta.toISOString()),
-    enabled: vista === 'inventario',
+    enabled: vista === 'inventario' || vista === 'crm',
   });
 
   // Navegación
@@ -271,6 +298,108 @@ export default function Auditorias() {
       .sort((a, b) => b.Total - a.Total);
   }, [usuarios, visitasFiltradas]);
 
+  // ── Agregaciones CRM ──────────────────────────────────────────────────────
+  const hist = historial as any[];
+
+  const crmPorModelo = useMemo(() => {
+    const map = new Map<string, { categoria: string; nombre: string; referencia: string; cantidad: number; instalaciones: number; coste: number; _instSet: Set<string> }>();
+    for (const h of hist) {
+      const key = h.articulo?.id ?? '?';
+      if (!map.has(key)) {
+        map.set(key, { categoria: h.articulo?.categoria ?? '—', nombre: h.articulo?.nombre ?? '—', referencia: h.articulo?.referencia ?? '', cantidad: 0, instalaciones: 0, coste: 0, _instSet: new Set() });
+      }
+      const row = map.get(key)!;
+      row.cantidad += Number(h.cantidad);
+      const instId = h.visita?.instalacion?.id ?? h.visita_id ?? '';
+      if (instId) row._instSet.add(instId);
+      if (h.precioUnitario) row.coste += Number(h.precioUnitario) * Number(h.cantidad);
+    }
+    return Array.from(map.values())
+      .map(r => ({ ...r, instalaciones: r._instSet.size }))
+      .sort((a, b) => b.cantidad - a.cantidad);
+  }, [hist]);
+
+  const crmPorPeriodo = useMemo(() => {
+    const getLabel = (dateStr: string) => {
+      const d = new Date(dateStr);
+      if (periodo === 'semana') { const day = d.getDay(); const lbl = DIAS_SEMANA[day === 0 ? 6 : day - 1]; return `${lbl} ${d.getDate()}`; }
+      if (periodo === 'mes') return `${d.getDate()} ${d.toLocaleDateString('es-ES', { month: 'short' })}`;
+      return MESES[d.getMonth()];
+    };
+    const ordered: string[] = periodo === 'semana'
+      ? DIAS_SEMANA.map((dia, i) => { const f = new Date(desde); f.setDate(f.getDate() + i); return `${dia} ${f.getDate()}`; })
+      : periodo === 'mes'
+        ? Array.from({ length: new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate() }, (_, i) => { const f = new Date(cursor.getFullYear(), cursor.getMonth(), i + 1); return `${i + 1} ${f.toLocaleDateString('es-ES', { month: 'short' })}`; })
+        : [...MESES];
+    const map = new Map<string, { label: string; paneles: number; inversores: number; otros: number; coste: number }>(
+      ordered.map(l => [l, { label: l, paneles: 0, inversores: 0, otros: 0, coste: 0 }])
+    );
+    for (const h of hist) {
+      const label = getLabel(h.createdAt);
+      if (!map.has(label)) continue;
+      const row = map.get(label)!;
+      const cat = h.articulo?.categoria ?? '';
+      const qty = Number(h.cantidad);
+      if (cat === 'Panel Solar') row.paneles += qty;
+      else if (cat === 'Inversor') row.inversores += qty;
+      else row.otros += qty;
+      if (h.precioUnitario) row.coste += Number(h.precioUnitario) * qty;
+    }
+    return Array.from(map.values());
+  }, [hist, periodo, desde, cursor]);
+
+  const crmPorTecnico = useMemo(() => {
+    const map = new Map<string, { nombre: string; paneles: number; inversores: number; otros: number; coste: number }>();
+    for (const h of hist) {
+      const id = h.visita?.tecnico?.id ?? '?';
+      const nombre = h.visita?.tecnico?.nombre ?? 'Desconocido';
+      if (!map.has(id)) map.set(id, { nombre, paneles: 0, inversores: 0, otros: 0, coste: 0 });
+      const row = map.get(id)!;
+      const cat = h.articulo?.categoria ?? '';
+      const qty = Number(h.cantidad);
+      if (cat === 'Panel Solar') row.paneles += qty;
+      else if (cat === 'Inversor') row.inversores += qty;
+      else row.otros += qty;
+      if (h.precioUnitario) row.coste += Number(h.precioUnitario) * qty;
+    }
+    return Array.from(map.values()).sort((a, b) => (b.paneles + b.inversores) - (a.paneles + a.inversores));
+  }, [hist]);
+
+  const crmPorInstalacion = useMemo(() => {
+    const map = new Map<string, { nombre: string; cliente: string; paneles: number; inversores: number; otros: number; coste: number }>();
+    for (const h of hist) {
+      const id = h.visita?.instalacion?.id ?? '?';
+      const nombre = h.visita?.instalacion?.nombre ?? 'Desconocida';
+      const cliente = h.visita?.instalacion?.cliente ?? '—';
+      if (!map.has(id)) map.set(id, { nombre, cliente, paneles: 0, inversores: 0, otros: 0, coste: 0 });
+      const row = map.get(id)!;
+      const cat = h.articulo?.categoria ?? '';
+      const qty = Number(h.cantidad);
+      if (cat === 'Panel Solar') row.paneles += qty;
+      else if (cat === 'Inversor') row.inversores += qty;
+      else row.otros += qty;
+      if (h.precioUnitario) row.coste += Number(h.precioUnitario) * qty;
+    }
+    return Array.from(map.values()).sort((a, b) => b.coste - a.coste).slice(0, 15);
+  }, [hist]);
+
+  const totalPaneles = crmPorModelo.filter(r => r.categoria === 'Panel Solar').reduce((s, r) => s + r.cantidad, 0);
+  const totalInversores = crmPorModelo.filter(r => r.categoria === 'Inversor').reduce((s, r) => s + r.cantidad, 0);
+  const totalCosteMat = crmPorModelo.reduce((s, r) => s + r.coste, 0);
+  const totalInstMat = new Set(hist.map((h: any) => h.visita?.instalacion?.id).filter(Boolean)).size;
+
+  const crmChartData = crmPorPeriodo
+    .filter(r => r.paneles > 0 || r.inversores > 0 || r.otros > 0)
+    .map(r => ({ name: r.label.slice(0, periodo === 'semana' ? 3 : periodo === 'mes' ? 2 : 4), Paneles: Math.round(r.paneles), Inversores: Math.round(r.inversores), Otros: Math.round(r.otros) }));
+
+  const CATEGORIA_COLORS: Record<string, string> = {
+    'Panel Solar': 'bg-amber-100 text-amber-700',
+    'Inversor': 'bg-blue-100 text-blue-700',
+    'Batería': 'bg-green-100 text-green-700',
+    'Cable': 'bg-slate-100 text-slate-600',
+    'Estructura': 'bg-orange-100 text-orange-700',
+  };
+
   const kpisForPDF = [
     { label: 'Total visitas', value: totalVisitas, sub: `${completadas} completadas` },
     { label: 'Instalaciones nuevas', value: instNuevas },
@@ -282,6 +411,7 @@ export default function Auditorias() {
     { id: 'actividad' as Vista, label: 'Actividad', icon: CalendarCheck },
     { id: 'kpis' as Vista, label: 'KPIs Técnicos', icon: Clock },
     { id: 'inventario' as Vista, label: 'Historial Inventario', icon: Package },
+    { id: 'crm' as Vista, label: 'Análisis Materiales', icon: BarChart2 },
   ];
 
   return (
@@ -360,6 +490,14 @@ export default function Auditorias() {
           {vista === 'inventario' && (
             <button
               onClick={() => exportHistorial(historial as any, titulo)}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
+            >
+              <Download size={15} /> Excel
+            </button>
+          )}
+          {vista === 'crm' && (
+            <button
+              onClick={() => exportCRM(crmPorModelo, crmPorPeriodo, crmPorTecnico, titulo)}
               className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
             >
               <Download size={15} /> Excel
@@ -663,6 +801,187 @@ export default function Auditorias() {
               )}
         </div>
       )}
+
+      {/* ── Vista: Análisis Materiales CRM ──────────────────────────────── */}
+      {vista === 'crm' && (
+        <>
+          {historialLoading && <p className="text-sm text-slate-400 text-center py-8">Cargando datos...</p>}
+
+          {!historialLoading && hist.length === 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 px-5 py-12 text-center">
+              <BarChart2 size={32} className="mx-auto text-slate-200 mb-2" />
+              <p className="text-sm text-slate-400">Sin materiales registrados en este período</p>
+              <p className="text-xs text-slate-300 mt-1">Añade artículos a las visitas para ver estadísticas</p>
+            </div>
+          )}
+
+          {!historialLoading && hist.length > 0 && (
+            <>
+              {/* KPIs resumen */}
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                <KpiCard label="Paneles instalados" value={Math.round(totalPaneles * 10) / 10}
+                  sub="unidades totales" icon={Zap} color="bg-amber-500" />
+                <KpiCard label="Inversores instalados" value={Math.round(totalInversores * 10) / 10}
+                  sub="unidades totales" icon={TrendingUp} color="bg-blue-500" />
+                <KpiCard label="Coste total materiales" value={`${totalCosteMat.toFixed(0)} €`}
+                  sub="todos los artículos" icon={Package} color="bg-green-500" />
+                <KpiCard label="Instalaciones atendidas" value={totalInstMat}
+                  sub="con material registrado" icon={Wrench} color="bg-violet-500" />
+              </div>
+
+              {/* Gráfico evolución temporal */}
+              {crmChartData.length > 0 && (
+                <div className="bg-white rounded-xl border border-slate-200">
+                  <div className="px-5 py-4 border-b border-slate-100">
+                    <h2 className="font-medium text-slate-900">Evolución de instalaciones — {titulo}</h2>
+                    <p className="text-xs text-slate-400 mt-0.5">Unidades de paneles e inversores registradas por período</p>
+                  </div>
+                  <div className="p-4">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={crmChartData} barSize={12}>
+                        <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                        <Tooltip />
+                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="Paneles" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="Inversores" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                        {crmChartData.some(d => d.Otros > 0) && (
+                          <Bar dataKey="Otros" fill="#94a3b8" radius={[3, 3, 0, 0]} />
+                        )}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Tabla: ranking por modelo/artículo */}
+              <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                  <BarChart2 size={16} className="text-slate-400" />
+                  <h2 className="font-medium text-slate-900">Ranking por modelo / artículo</h2>
+                  <span className="ml-auto text-xs text-slate-400">{crmPorModelo.length} modelos distintos</span>
+                </div>
+                <table className="w-full text-xs min-w-[700px]">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      {['Categoría', 'Modelo', 'Referencia', 'Uds. instaladas', 'Instalaciones', 'Coste total'].map(h => (
+                        <th key={h} className="px-3 py-2.5 text-left font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {crmPorModelo.map((r, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="px-3 py-2.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${CATEGORIA_COLORS[r.categoria] ?? 'bg-slate-100 text-slate-600'}`}>
+                            {r.categoria}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 font-medium text-slate-900">{r.nombre}</td>
+                        <td className="px-3 py-2.5 text-slate-400 font-mono text-[11px]">{r.referencia || '—'}</td>
+                        <td className="px-3 py-2.5 font-semibold text-slate-900">
+                          {Math.round(r.cantidad * 1000) / 1000}
+                          <div className="mt-0.5 h-1 bg-slate-100 rounded-full overflow-hidden w-24">
+                            <div className="h-full bg-amber-400 rounded-full" style={{ width: `${Math.min(100, (r.cantidad / (crmPorModelo[0]?.cantidad || 1)) * 100)}%` }} />
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-600">{r.instalaciones || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 font-medium">{r.coste > 0 ? `${r.coste.toFixed(2)} €` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
+                    <tr>
+                      <td colSpan={3} className="px-3 py-2.5 text-slate-700">TOTAL</td>
+                      <td className="px-3 py-2.5">{Math.round(crmPorModelo.reduce((s, r) => s + r.cantidad, 0) * 100) / 100}</td>
+                      <td className="px-3 py-2.5">—</td>
+                      <td className="px-3 py-2.5">{totalCosteMat.toFixed(2)} €</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* Dos columnas: Por técnico | Por instalación */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                {/* Por técnico */}
+                <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+                  <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                    <Users size={16} className="text-slate-400" />
+                    <h2 className="font-medium text-slate-900">Materiales por técnico</h2>
+                  </div>
+                  {crmPorTecnico.length === 0
+                    ? <p className="px-5 py-6 text-xs text-slate-400 text-center">Sin datos</p>
+                    : (
+                      <table className="w-full text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            {['Técnico', 'Paneles', 'Inversores', 'Otros', 'Coste'].map(h => (
+                              <th key={h} className="px-3 py-2.5 text-left font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {crmPorTecnico.map((r, i) => (
+                            <tr key={i} className="hover:bg-slate-50">
+                              <td className="px-3 py-2.5 font-medium text-slate-900">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-5 h-5 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-brand text-[9px] font-bold">{r.nombre[0]}</span>
+                                  </div>
+                                  {r.nombre}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2.5 text-amber-600 font-medium">{Math.round(r.paneles * 10) / 10 || '—'}</td>
+                              <td className="px-3 py-2.5 text-blue-600 font-medium">{Math.round(r.inversores * 10) / 10 || '—'}</td>
+                              <td className="px-3 py-2.5 text-slate-500">{Math.round(r.otros * 10) / 10 || '—'}</td>
+                              <td className="px-3 py-2.5 text-slate-700">{r.coste > 0 ? `${r.coste.toFixed(0)} €` : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                </div>
+
+                {/* Por instalación (top) */}
+                <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+                  <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                    <Wrench size={16} className="text-slate-400" />
+                    <h2 className="font-medium text-slate-900">Top instalaciones por coste material</h2>
+                    <span className="ml-auto text-xs text-slate-400">máx. 15</span>
+                  </div>
+                  {crmPorInstalacion.length === 0
+                    ? <p className="px-5 py-6 text-xs text-slate-400 text-center">Sin datos</p>
+                    : (
+                      <table className="w-full text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            {['Instalación', 'Paneles', 'Inversores', 'Coste'].map(h => (
+                              <th key={h} className="px-3 py-2.5 text-left font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {crmPorInstalacion.map((r, i) => (
+                            <tr key={i} className="hover:bg-slate-50">
+                              <td className="px-3 py-2.5">
+                                <p className="font-medium text-slate-900 truncate max-w-[140px]">{r.nombre}</p>
+                                <p className="text-slate-400 truncate max-w-[140px]">{r.cliente}</p>
+                              </td>
+                              <td className="px-3 py-2.5 text-amber-600 font-medium">{Math.round(r.paneles * 10) / 10 || '—'}</td>
+                              <td className="px-3 py-2.5 text-blue-600 font-medium">{Math.round(r.inversores * 10) / 10 || '—'}</td>
+                              <td className="px-3 py-2.5 font-semibold text-slate-900">{r.coste > 0 ? `${r.coste.toFixed(2)} €` : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
+
