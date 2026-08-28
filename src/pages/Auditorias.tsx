@@ -138,6 +138,8 @@ export default function Auditorias() {
   const [cursor, setCursor] = useState(new Date());
   const [tipoFiltro, setTipoFiltro] = useState('todos');
   const [vista, setVista] = useState<Vista>('actividad');
+  const [crmCategoria, setCrmCategoria] = useState('');
+  const [crmTecnico, setCrmTecnico] = useState('');
 
   const { data: visitas = [] } = useQuery({ queryKey: ['visitas'], queryFn: visitasApi.list });
   const { data: incidencias = [] } = useQuery({ queryKey: ['incidencias'], queryFn: incidenciasApi.list });
@@ -299,7 +301,16 @@ export default function Auditorias() {
   }, [usuarios, visitasFiltradas]);
 
   // ── Agregaciones CRM ──────────────────────────────────────────────────────
-  const hist = historial as any[];
+  const histRaw = historial as any[];
+  const hist = histRaw.filter(h => {
+    if (crmCategoria && h.articulo?.categoria !== crmCategoria) return false;
+    if (crmTecnico && h.visita?.tecnico?.id !== crmTecnico) return false;
+    return true;
+  });
+  const crmCategorias = [...new Set(histRaw.map((h: any) => h.articulo?.categoria).filter(Boolean))].sort() as string[];
+  const crmTecnicos = [...new Map(histRaw.map((h: any) => [h.visita?.tecnico?.id, h.visita?.tecnico?.nombre]).filter(([id]) => id)).entries()]
+    .map(([id, nombre]) => ({ id, nombre }))
+    .sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? ''));
 
   const crmPorModelo = useMemo(() => {
     const map = new Map<string, { categoria: string; nombre: string; referencia: string; cantidad: number; instalaciones: number; coste: number; _instSet: Set<string> }>();
@@ -807,11 +818,37 @@ export default function Auditorias() {
         <>
           {historialLoading && <p className="text-sm text-slate-400 text-center py-8">Cargando datos...</p>}
 
+          {/* Filtros CRM */}
+          {!historialLoading && histRaw.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex flex-wrap gap-3 items-center">
+              <span className="text-xs font-medium text-slate-500">Filtrar por:</span>
+              <select value={crmCategoria} onChange={e => setCrmCategoria(e.target.value)}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand">
+                <option value="">Todas las categorías</option>
+                {crmCategorias.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={crmTecnico} onChange={e => setCrmTecnico(e.target.value)}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand">
+                <option value="">Todos los técnicos</option>
+                {crmTecnicos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+              </select>
+              {(crmCategoria || crmTecnico) && (
+                <button onClick={() => { setCrmCategoria(''); setCrmTecnico(''); }}
+                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 border border-red-200 rounded-lg bg-red-50">
+                  <X size={11} /> Limpiar filtros
+                </button>
+              )}
+              {(crmCategoria || crmTecnico) && (
+                <span className="text-xs text-slate-400 ml-auto">{hist.length} registros filtrados de {histRaw.length}</span>
+              )}
+            </div>
+          )}
+
           {!historialLoading && hist.length === 0 && (
             <div className="bg-white rounded-xl border border-slate-200 px-5 py-12 text-center">
               <BarChart2 size={32} className="mx-auto text-slate-200 mb-2" />
-              <p className="text-sm text-slate-400">Sin materiales registrados en este período</p>
-              <p className="text-xs text-slate-300 mt-1">Añade artículos a las visitas para ver estadísticas</p>
+              <p className="text-sm text-slate-400">{histRaw.length === 0 ? 'Sin materiales registrados en este período' : 'Sin resultados para los filtros aplicados'}</p>
+              <p className="text-xs text-slate-300 mt-1">{histRaw.length === 0 ? 'Añade artículos a las visitas para ver estadísticas' : 'Prueba a cambiar los filtros'}</p>
             </div>
           )}
 

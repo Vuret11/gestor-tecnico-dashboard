@@ -1,9 +1,11 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { User } from '../types';
 
+export type AuthUser = Pick<User, 'id' | 'nombre' | 'email' | 'rol' | 'departamento' | 'modulosAcceso'>;
+
 interface AuthContextType {
-  user: Pick<User, 'id' | 'nombre' | 'email' | 'rol'> | null;
-  login: (token: string, user: AuthContextType['user']) => void;
+  user: AuthUser | null;
+  login: (token: string, user: AuthUser) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }

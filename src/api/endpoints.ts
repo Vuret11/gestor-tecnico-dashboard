@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo, InventarioArticulo, VisitaArticulo } from '../types';
+import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo, InventarioArticulo, VisitaArticulo, ProyectoIngenieria } from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -12,7 +12,20 @@ export const users = {
     api.post<User>('/usuarios', data).then(r => r.data),
   update: (id: string, data: Partial<User>) =>
     api.patch<User>(`/usuarios/${id}`, data).then(r => r.data),
+  setModulos: (id: string, modulosAcceso: string[] | null) =>
+    api.patch<User>(`/usuarios/${id}/modulos`, { modulosAcceso }).then(r => r.data),
   remove: (id: string) => api.delete(`/usuarios/${id}`),
+};
+
+export const ingenieria = {
+  list: (todos?: boolean) =>
+    api.get<ProyectoIngenieria[]>('/ingenieria', { params: todos ? { todos: 'true' } : {} }).then(r => r.data),
+  get: (id: string) => api.get<ProyectoIngenieria>(`/ingenieria/${id}`).then(r => r.data),
+  create: (data: Partial<ProyectoIngenieria>) =>
+    api.post<ProyectoIngenieria>('/ingenieria', data).then(r => r.data),
+  update: (id: string, data: Partial<ProyectoIngenieria>) =>
+    api.patch<ProyectoIngenieria>(`/ingenieria/${id}`, data).then(r => r.data),
+  remove: (id: string) => api.delete(`/ingenieria/${id}`),
 };
 
 export const clientes = {

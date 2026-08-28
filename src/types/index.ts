@@ -23,6 +23,30 @@ export interface User {
   rol: Rol;
   activo: boolean;
   telefono?: string;
+  departamento?: string;
+  modulosAcceso?: string[] | null;
+  createdAt: string;
+}
+
+export type TipoProyecto = 'fv' | 'rite' | 'aerotermia' | 'hibrido' | 'otro';
+export type EstadoProyecto = 'diseño' | 'pendiente_aprobacion' | 'aprobado' | 'en_ejecucion' | 'completado' | 'cancelado';
+
+export interface ProyectoIngenieria {
+  id: string;
+  nombre: string;
+  cliente: string;
+  tipo: TipoProyecto;
+  estado: EstadoProyecto;
+  descripcion?: string;
+  potencia_kwp?: number;
+  presupuesto?: number;
+  fechaEntregaEstimada?: string;
+  direccion?: string;
+  provincia?: string;
+  notas?: string;
+  tecnico_id?: string;
+  tecnico?: User;
+  activo: boolean;
   createdAt: string;
 }
 
@@ -290,5 +314,5 @@ export interface RepoArchivo {
 
 export interface AuthResponse {
   access_token: string;
-  user: Pick<User, 'id' | 'nombre' | 'email' | 'rol'>;
+  user: Pick<User, 'id' | 'nombre' | 'email' | 'rol' | 'departamento' | 'modulosAcceso'>;
 }

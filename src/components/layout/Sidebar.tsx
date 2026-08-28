@@ -2,32 +2,37 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Users, Wrench,
   FileText, AlertTriangle, LogOut, ClipboardList, UserCheck, ShieldCheck,
-  HardHat, FolderOpen, Package,
+  HardHat, FolderOpen, Package, Cpu, Lock,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { usePermissions, type Modulo } from '../../hooks/usePermissions';
 import clsx from 'clsx';
 
-const nav = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/clientes', icon: UserCheck, label: 'Partners' },
-  { to: '/tecnicos', icon: Users, label: 'Personal Oficina' },
-  { to: '/instalaciones', icon: Building2, label: 'Instalaciones' },
-  { to: '/visitas', icon: Wrench, label: 'Visitas' },
-  { to: '/informes', icon: FileText, label: 'Informes' },
-  { to: '/incidencias', icon: AlertTriangle, label: 'Incidencias' },
-  { to: '/checklists', icon: ClipboardList, label: 'Checklists' },
-  { to: '/auditorias', icon: ShieldCheck, label: 'Auditorías' },
-  { to: '/planificacion', icon: HardHat, label: 'Planificación' },
-  { to: '/inventario', icon: Package, label: 'Inventario' },
-  { to: '/repositorio', icon: FolderOpen, label: 'Repositorio' },
+const ALL_NAV: { to: string; icon: any; label: string; modulo: Modulo }[] = [
+  { to: '/',             icon: LayoutDashboard, label: 'Dashboard',     modulo: 'dashboard' },
+  { to: '/clientes',     icon: UserCheck,       label: 'Partners',      modulo: 'clientes' },
+  { to: '/tecnicos',     icon: Users,           label: 'Personal',      modulo: 'usuarios' },
+  { to: '/instalaciones',icon: Building2,       label: 'Instalaciones', modulo: 'instalaciones' },
+  { to: '/visitas',      icon: Wrench,          label: 'Visitas',       modulo: 'visitas' },
+  { to: '/informes',     icon: FileText,        label: 'Informes',      modulo: 'visitas' },
+  { to: '/incidencias',  icon: AlertTriangle,   label: 'Incidencias',   modulo: 'incidencias' },
+  { to: '/checklists',   icon: ClipboardList,   label: 'Checklists',    modulo: 'visitas' },
+  { to: '/planificacion',icon: HardHat,         label: 'Planificación', modulo: 'planificacion' },
+  { to: '/inventario',   icon: Package,         label: 'Inventario',    modulo: 'inventario' },
+  { to: '/repositorio',  icon: FolderOpen,      label: 'Repositorio',   modulo: 'repositorio' },
+  { to: '/auditorias',   icon: ShieldCheck,     label: 'Auditorías',    modulo: 'auditorias' },
+  { to: '/ingenieria',   icon: Cpu,             label: 'Ingeniería',    modulo: 'ingenieria' },
+  { to: '/permisos',     icon: Lock,            label: 'Permisos',      modulo: 'permisos' },
 ];
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { puede } = usePermissions();
+
+  const nav = ALL_NAV.filter(item => puede(item.modulo));
 
   return (
     <aside className="w-56 bg-slate-900 text-slate-300 flex flex-col h-screen sticky top-0 shrink-0">
-      {/* Logo HomeServe Solar */}
       <div className="px-4 py-5 border-b border-slate-700/60">
         <img
           src="https://homeservesolar.es/wp-content/uploads/2024/07/HomeServe-Solar-brand-blanco.svg"
@@ -74,6 +79,9 @@ export default function Sidebar() {
           <div className="min-w-0">
             <p className="text-xs text-slate-200 truncate font-medium">{user?.nombre}</p>
             <p className="text-[10px] text-slate-500 uppercase tracking-wide">{user?.rol}</p>
+            {user?.departamento && (
+              <p className="text-[10px] text-slate-600 truncate">{user.departamento}</p>
+            )}
           </div>
         </div>
         <button
