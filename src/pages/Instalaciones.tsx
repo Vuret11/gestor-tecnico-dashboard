@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instalaciones as api, clientes as clientesApi } from '../api/endpoints';
 import type { Instalacion, Cliente } from '../types';
-import { Plus, Pencil, MapPin, Trash2 } from 'lucide-react';
+import { Plus, Pencil, MapPin, Trash2, Search, X } from 'lucide-react';
 
 function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
   const qc = useQueryClient();
@@ -132,9 +132,32 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
 export default function Instalaciones() {
   const qc = useQueryClient();
   const { data = [], isLoading } = useQuery({ queryKey: ['instalaciones'], queryFn: api.list });
+  const { data: partners = [] } = useQuery({ queryKey: ['clientes'], queryFn: clientesApi.list });
   const [modal, setModal] = useState<{ open: boolean; item?: Instalacion }>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Filtros
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroPartner, setFiltroPartner] = useState('');
+
+  const filtradas = useMemo(() => {
+    const q = busqueda.toLowerCase();
+    return (data as Instalacion[]).filter(inst => {
+      if (filtroTipo && inst.tipoInstalacion !== filtroTipo) return false;
+      if (filtroPartner && inst.clienteId !== filtroPartner && inst.cliente !== filtroPartner) return false;
+      if (q && !(
+        inst.nombre.toLowerCase().includes(q) ||
+        (inst.clienteData?.nombre ?? inst.cliente ?? '').toLowerCase().includes(q) ||
+        (inst.ciudad ?? '').toLowerCase().includes(q) ||
+        (inst.provincia ?? '').toLowerCase().includes(q)
+      )) return false;
+      return true;
+    });
+  }, [data, busqueda, filtroTipo, filtroPartner]);
+
+  const hayFiltros = busqueda || filtroTipo || filtroPartner;
 
   const eliminar = useMutation({
     mutationFn: (id: string) => api.remove(id),
@@ -150,16 +173,59 @@ export default function Instalaciones() {
   });
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-6 space-y-4">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Instalaciones</h1>
-          <p className="text-sm text-slate-500">{data.length} instalaciones</p>
+          <p className="text-sm text-slate-500">
+            {filtradas.length}{filtradas.length !== data.length ? ` de ${data.length}` : ''} instalaciones
+          </p>
         </div>
         <button onClick={() => setModal({ open: true })}
           className="flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg text-sm hover:bg-brand-dark">
           <Plus size={16} /> Nueva
         </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre, partner, ciudad..."
+            className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white"
+          />
+        </div>
+        <select
+          value={filtroTipo}
+          onChange={e => setFiltroTipo(e.target.value)}
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+        >
+          <option value="">Todos los tipos</option>
+          <option value="fv">Fotovoltaica (FV)</option>
+          <option value="rite">RITE / Aerotermia</option>
+          <option value="otro">Otro</option>
+        </select>
+        <select
+          value={filtroPartner}
+          onChange={e => setFiltroPartner(e.target.value)}
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+        >
+          <option value="">Todos los partners</option>
+          {(partners as Cliente[]).map(p => (
+            <option key={p.id} value={p.id}>{p.nombre}</option>
+          ))}
+        </select>
+        {hayFiltros && (
+          <button
+            onClick={() => { setBusqueda(''); setFiltroTipo(''); setFiltroPartner(''); }}
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-500 border border-slate-200 rounded-lg px-2 py-2"
+          >
+            <X size={12} /> Limpiar
+          </button>
+        )}
       </div>
 
       {isLoading
@@ -175,14 +241,14 @@ export default function Instalaciones() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {data.length === 0 && (
+                {filtradas.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-10 text-center text-slate-400 text-sm">
-                      Sin instalaciones registradas
+                      {hayFiltros ? 'Sin resultados para los filtros aplicados' : 'Sin instalaciones registradas'}
                     </td>
                   </tr>
                 )}
-                {data.map(inst => (
+                {filtradas.map(inst => (
                   <tr key={inst.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-slate-600">
                       {inst.clienteData?.nombre ?? inst.cliente
