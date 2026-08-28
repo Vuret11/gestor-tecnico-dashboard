@@ -302,13 +302,6 @@ export default function ClienteDetalle() {
             <h2 className="font-semibold text-slate-900">Instalaciones</h2>
             <p className="text-xs text-slate-500 mt-0.5">{insts.length} instalaciones vinculadas</p>
           </div>
-          <button
-            onClick={() => setInstModal({ open: true })}
-            className="flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg text-sm hover:bg-brand-dark"
-          >
-            <Plus size={15} />
-            Nueva instalación
-          </button>
         </div>
 
         {loadingInsts ? (
@@ -317,14 +310,7 @@ export default function ClienteDetalle() {
           <div className="p-12 text-center">
             <Building2 size={40} className="mx-auto text-slate-200 mb-3" />
             <p className="text-slate-500 font-medium text-sm">Sin instalaciones aún</p>
-            <p className="text-slate-400 text-xs mt-1">Añade la primera instalación de este partner</p>
-            <button
-              onClick={() => setInstModal({ open: true })}
-              className="mt-4 flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg text-sm hover:bg-brand-dark mx-auto"
-            >
-              <Plus size={15} />
-              Nueva instalación
-            </button>
+            <p className="text-slate-400 text-xs mt-1">Crea instalaciones desde el módulo de Instalaciones</p>
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
