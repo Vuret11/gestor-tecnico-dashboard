@@ -318,7 +318,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
 }
 
 // ─── Panel lateral: detalle + adjuntos de una visita ─────────────────────────
-function VisitaPanel({ visita, onClose }: { visita: Visita; onClose: () => void }) {
+function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () => void; onEdit: (v: Visita) => void }) {
   const qc = useQueryClient();
   const { data: adjuntos = [], isLoading, refetch } = useQuery({
     queryKey: ['fotos-visita', visita.id],
@@ -326,7 +326,6 @@ function VisitaPanel({ visita, onClose }: { visita: Visita; onClose: () => void 
   });
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [editando, setEditando] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const eliminar = useMutation({
@@ -372,7 +371,7 @@ function VisitaPanel({ visita, onClose }: { visita: Visita; onClose: () => void 
           {/* Acciones */}
           <div className="flex gap-2 mt-3">
             <button
-              onClick={() => setEditando(true)}
+              onClick={() => onEdit(visita)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand text-white rounded-lg hover:bg-brand-dark"
             >
               <Pencil size={12} /> Editar
@@ -519,12 +518,6 @@ function VisitaPanel({ visita, onClose }: { visita: Visita; onClose: () => void 
         </div>
       </div>
 
-      {editando && (
-        <Modal
-          editing={visita}
-          onClose={() => setEditando(false)}
-        />
-      )}
     </>
   );
 }
@@ -561,6 +554,7 @@ export default function Visitas() {
   const { data = [], isLoading } = useQuery({ queryKey: ['visitas'], queryFn: api.list });
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Visita | null>(null);
+  const [editing, setEditing] = useState<Visita | null>(null);
 
   // Búsqueda global
   const [busqueda, setBusqueda] = useState('');
@@ -794,7 +788,14 @@ export default function Visitas() {
         )}
 
       {open && <Modal onClose={() => setOpen(false)} />}
-      {selected && <VisitaPanel visita={selected} onClose={() => setSelected(null)} />}
+      {editing && <Modal editing={editing} onClose={() => setEditing(null)} />}
+      {selected && (
+        <VisitaPanel
+          visita={selected}
+          onClose={() => setSelected(null)}
+          onEdit={(v) => { setEditing(v); setSelected(null); }}
+        />
+      )}
     </div>
   );
 }
