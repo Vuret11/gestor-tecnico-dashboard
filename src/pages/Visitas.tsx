@@ -58,6 +58,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
   const [adjuntos, setAdjuntos] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [saveError, setSaveError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const instsFiltradas = insts.filter(i =>
@@ -86,7 +87,11 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     mutationFn: () => editing
       ? api.update(editing.id, formData())
       : api.create(formData()),
+    onError: (err: any) => {
+      setSaveError(err?.response?.data?.message ?? err?.message ?? 'Error al guardar');
+    },
     onSuccess: async (visita) => {
+      setSaveError('');
       if (!editing && form.plantillaId) {
         try { await checklistsApi.asignar(visita.id, form.plantillaId); } catch { /* non-fatal */ }
       }
@@ -294,6 +299,11 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
           </div>
         )}
 
+        {saveError && (
+          <div className="mx-6 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            {saveError}
+          </div>
+        )}
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600">Cancelar</button>
           <button onClick={() => save.mutate()}
