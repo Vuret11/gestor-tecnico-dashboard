@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion } from '../types';
+import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo } from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -125,6 +125,29 @@ export const planificacion = {
     create: (d: Partial<PlanAsignacion>) => api.post<PlanAsignacion>('/planificacion/asignaciones', d).then(r => r.data),
     update: (id: string, d: Partial<PlanAsignacion>) => api.patch<PlanAsignacion>(`/planificacion/asignaciones/${id}`, d).then(r => r.data),
     remove: (id: string) => api.delete(`/planificacion/asignaciones/${id}`),
+  },
+};
+
+export const repositorio = {
+  carpetas: {
+    list: () => api.get<RepoCarpeta[]>('/repositorio/carpetas').then(r => r.data),
+    create: (data: { nombre: string; descripcion?: string }) =>
+      api.post<RepoCarpeta>('/repositorio/carpetas', data).then(r => r.data),
+    update: (id: string, data: { nombre?: string; descripcion?: string }) =>
+      api.patch<RepoCarpeta>(`/repositorio/carpetas/${id}`, data).then(r => r.data),
+    remove: (id: string) => api.delete(`/repositorio/carpetas/${id}`),
+  },
+  archivos: {
+    list: (carpetaId: string) =>
+      api.get<RepoArchivo[]>(`/repositorio/carpetas/${carpetaId}/archivos`).then(r => r.data),
+    upload: (carpetaId: string, file: File) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return api.post<RepoArchivo>(`/repositorio/carpetas/${carpetaId}/archivos`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then(r => r.data);
+    },
+    remove: (id: string) => api.delete(`/repositorio/archivos/${id}`),
   },
 };
 

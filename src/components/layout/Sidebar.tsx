@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Users, Wrench,
   FileText, AlertTriangle, LogOut, ClipboardList, UserCheck, ShieldCheck,
-  HardHat,
+  HardHat, FolderOpen,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
@@ -18,6 +18,7 @@ const nav = [
   { to: '/checklists', icon: ClipboardList, label: 'Checklists' },
   { to: '/auditorias', icon: ShieldCheck, label: 'Auditorías' },
   { to: '/planificacion', icon: HardHat, label: 'Planificación' },
+  { to: '/repositorio', icon: FolderOpen, label: 'Repositorio' },
 ];
 
 export default function Sidebar() {

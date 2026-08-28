@@ -15,6 +15,7 @@ import Clientes from './pages/Clientes';
 import ClienteDetalle from './pages/ClienteDetalle';
 import Auditorias from './pages/Auditorias';
 import Planificacion from './pages/planificacion/Planificacion';
+import Repositorio from './pages/Repositorio';
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -40,6 +41,7 @@ export default function App() {
               <Route path="/checklists" element={<Checklists />} />
               <Route path="/auditorias" element={<Auditorias />} />
               <Route path="/planificacion" element={<Planificacion />} />
+              <Route path="/repositorio" element={<Repositorio />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

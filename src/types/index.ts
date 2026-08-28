@@ -240,6 +240,26 @@ export interface PlanAsignacion {
   createdAt: string;
 }
 
+// ── Repositorio ───────────────────────────────────────────────────────────────
+export interface RepoCarpeta {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  activo: boolean;
+  createdAt: string;
+}
+
+export interface RepoArchivo {
+  id: string;
+  carpeta_id: string;
+  nombre: string;
+  url: string;
+  tipo?: string;
+  tamaño?: number;
+  subidoPor?: User;
+  createdAt: string;
+}
+
 export interface AuthResponse {
   access_token: string;
   user: Pick<User, 'id' | 'nombre' | 'email' | 'rol'>;

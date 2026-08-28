@@ -563,9 +563,16 @@ export default function PlanSemanal() {
                                       draggedVisitaFechaProgramada.current = null;
                                     }}
                                     onDoubleClick={() => navigate(`/visitas?id=${v.id}`)}
-                                    className="rounded-md px-2 py-1.5 text-xs bg-amber-50 border border-amber-200 hover:border-amber-400 transition-colors cursor-grab active:cursor-grabbing"
+                                    className={`rounded-md px-2 py-1.5 text-xs transition-colors cursor-grab active:cursor-grabbing border ${
+                                      v.viaja
+                                        ? 'bg-red-50 border-red-200 hover:border-red-400'
+                                        : 'bg-amber-50 border-amber-200 hover:border-amber-400'
+                                    }`}
                                   >
-                                    <p className="font-bold text-slate-900 truncate">{v.instalacion?.nombre ?? '—'}</p>
+                                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                                      <p className="font-bold text-slate-900 truncate">{v.instalacion?.nombre ?? '—'}</p>
+                                      {v.viaja && <Plane size={9} className="text-red-500 flex-shrink-0" />}
+                                    </div>
                                     <p className="text-amber-700 truncate leading-tight">{TIPO_VISITA_LABELS[v.tipo] ?? v.tipo}</p>
                                     {v.instalacion?.ciudad && <p className="text-slate-400 truncate leading-tight text-[10px]">{v.instalacion.ciudad}</p>}
                                   </div>
