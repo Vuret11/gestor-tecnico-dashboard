@@ -279,8 +279,11 @@ export default function PlanSemanal() {
   const [provinciaId, setProvinciaId] = useState('');
   const [modal, setModal] = useState<{ tecnico: PlanTecnico; fecha: string; asignacion?: PlanAsignacion } | null>(null);
 
-  // Drag & drop state
+  // Drag & drop state (asignaciones azules)
   const draggedId = useRef<string | null>(null);
+  // Drag & drop state (visitas amarillas)
+  const draggedVisitaId = useRef<string | null>(null);
+  const draggedVisitaFechaProgramada = useRef<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null); // `${tecnicoId}_${fecha}`
 
   const weekStart = useMemo(() => getWeekStart(cursor), [cursor]);
@@ -325,6 +328,16 @@ export default function PlanSemanal() {
       api.asignaciones.update(id, { tecnico_id, fecha }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['plan-semana'] });
+      qc.invalidateQueries({ queryKey: ['plan-conflictos'] });
+    },
+  });
+
+  const moverVisita = useMutation({
+    mutationFn: ({ id, tecnico_id, fechaProgramada }: { id: string; tecnico_id: string; fechaProgramada: string }) =>
+      visitasApi.update(id, { tecnico_id, fechaProgramada }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plan-semana'] });
+      qc.invalidateQueries({ queryKey: ['visitas-semana'] });
       qc.invalidateQueries({ queryKey: ['plan-conflictos'] });
     },
   });
@@ -506,6 +519,15 @@ export default function PlanSemanal() {
                                 if (draggedId.current) {
                                   mover.mutate({ id: draggedId.current, tecnico_id: t.id, fecha });
                                   draggedId.current = null;
+                                } else if (draggedVisitaId.current && draggedVisitaFechaProgramada.current && t.user_id) {
+                                  const time = draggedVisitaFechaProgramada.current.split('T')[1] ?? '09:00:00.000Z';
+                                  moverVisita.mutate({
+                                    id: draggedVisitaId.current,
+                                    tecnico_id: t.user_id,
+                                    fechaProgramada: `${fecha}T${time}`,
+                                  });
+                                  draggedVisitaId.current = null;
+                                  draggedVisitaFechaProgramada.current = null;
                                 }
                               }}
                             >
@@ -520,7 +542,20 @@ export default function PlanSemanal() {
                                   />
                                 ))}
                                 {celdaVisitas.map(v => (
-                                  <div key={v.id} className="rounded-md px-2 py-1.5 text-xs bg-amber-50 border border-amber-200 hover:border-amber-400 transition-colors">
+                                  <div
+                                    key={v.id}
+                                    draggable
+                                    onDragStart={e => {
+                                      e.dataTransfer.effectAllowed = 'move';
+                                      draggedVisitaId.current = v.id;
+                                      draggedVisitaFechaProgramada.current = v.fechaProgramada;
+                                    }}
+                                    onDragEnd={() => {
+                                      draggedVisitaId.current = null;
+                                      draggedVisitaFechaProgramada.current = null;
+                                    }}
+                                    className="rounded-md px-2 py-1.5 text-xs bg-amber-50 border border-amber-200 hover:border-amber-400 transition-colors cursor-grab active:cursor-grabbing"
+                                  >
                                     <p className="font-bold text-slate-900 truncate">{v.instalacion?.nombre ?? '—'}</p>
                                     <p className="text-amber-700 truncate leading-tight">{TIPO_VISITA_LABELS[v.tipo] ?? v.tipo}</p>
                                     {v.instalacion?.ciudad && <p className="text-slate-400 truncate leading-tight text-[10px]">{v.instalacion.ciudad}</p>}
