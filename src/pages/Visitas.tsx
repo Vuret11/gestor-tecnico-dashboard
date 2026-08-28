@@ -46,6 +46,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
   const tecnicos = users.filter(u => u.rol === 'tecnico' && u.activo);
   const paneles = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Panel Solar' && a.activo);
   const inversores = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Inversor' && a.activo);
+  const baterias = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Batería' && a.activo);
 
   const [form, setForm] = useState({
     instalacion_id: editing?.instalacion_id ?? '',
@@ -57,6 +58,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     notas: editing?.notas ?? '',
     modalidad: editing?.modalidad ?? '',
     viaja: editing?.viaja ?? false,
+    llevaAts: (editing as any)?.llevaAts ?? false,
     importeExtras: editing?.importeExtras != null ? String(editing.importeExtras) : '',
     plantillaId: '',
   });
@@ -65,6 +67,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
   const [panelCant, setPanelCant] = useState('1');
   const [inversorId, setInversorId] = useState('');
   const [inversorCant, setInversorCant] = useState('1');
+  const [bateriaId, setBateriaId] = useState('');
+  const [bateriaCant, setBateriaCant] = useState('1');
   const [adjuntos, setAdjuntos] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -114,6 +118,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
           stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: panelId, cantidad: Number(panelCant) }));
         if (inversorId && Number(inversorCant) > 0)
           stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: inversorId, cantidad: Number(inversorCant) }));
+        if (bateriaId && Number(bateriaCant) > 0)
+          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: bateriaId, cantidad: Number(bateriaCant) }));
         if (stockOps.length > 0) await Promise.allSettled(stockOps);
       }
       if (!editing && adjuntos.length > 0) {
@@ -323,6 +329,40 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
               </div>
             </div>
           )}
+
+          {/* Baterías (solo al crear) */}
+          {!editing && baterias.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Batería (descuenta stock)</label>
+              <div className="flex gap-2">
+                <select value={bateriaId} onChange={e => setBateriaId(e.target.value)}
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
+                  <option value="">— Ninguna —</option>
+                  {baterias.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre} (stock: {Number(a.stockActual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                    </option>
+                  ))}
+                </select>
+                {bateriaId && (
+                  <input type="number" min="1" step="1" value={bateriaCant} onChange={e => setBateriaCant(e.target.value)}
+                    placeholder="Cant." className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ATS */}
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.llevaAts}
+              onChange={e => setForm(f => ({ ...f, llevaAts: e.target.checked }))}
+              className="rounded border-slate-300 text-amber-500"
+            />
+            <span className="font-semibold text-amber-600 text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200">ATS</span>
+            <span className="text-slate-600">Lleva ATS (Automatic Transfer Switch)</span>
+          </label>
 
           {/* Notas */}
           <div>
@@ -545,6 +585,14 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
             <div>
               <p className="text-slate-400 mb-0.5">Modalidad</p>
               <p className="font-medium text-slate-700 capitalize">{visita.modalidad}</p>
+            </div>
+          )}
+          {(visita as any).llevaAts && (
+            <div>
+              <p className="text-slate-400 mb-0.5">ATS</p>
+              <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                Lleva ATS
+              </span>
             </div>
           )}
           {visita.notas && (
