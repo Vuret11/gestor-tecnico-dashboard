@@ -43,6 +43,7 @@ export interface Instalacion {
   longitud?: number;
   notas?: string;
   tipoInstalacion?: TipoInstalacion | null;
+  importe?: number;
   activo: boolean;
   createdAt: string;
 }
@@ -61,6 +62,7 @@ export interface Visita {
   notas?: string;
   modalidad?: 'nueva' | 'reforma';
   viaja?: boolean;
+  importeExtras?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -237,6 +239,32 @@ export interface PlanAsignacion {
   estadoEspecial?: EstadoEspecial | null;
   viaja: boolean;
   observaciones?: string;
+  createdAt: string;
+}
+
+// ── Inventario ────────────────────────────────────────────────────────────────
+export interface InventarioArticulo {
+  id: string;
+  referencia?: string;
+  nombre: string;
+  descripcion?: string;
+  unidad: string;
+  stockActual: number;
+  stockMinimo: number;
+  precioUnitario?: number;
+  categoria?: string;
+  activo: boolean;
+  createdAt: string;
+}
+
+export interface VisitaArticulo {
+  id: string;
+  visita_id: string;
+  articulo_id: string;
+  articulo: InventarioArticulo;
+  cantidad: number;
+  precioUnitario?: number;
+  notas?: string;
   createdAt: string;
 }
 

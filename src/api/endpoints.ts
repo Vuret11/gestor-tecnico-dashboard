@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo } from '../types';
+import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo, InventarioArticulo, VisitaArticulo } from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -125,6 +125,27 @@ export const planificacion = {
     create: (d: Partial<PlanAsignacion>) => api.post<PlanAsignacion>('/planificacion/asignaciones', d).then(r => r.data),
     update: (id: string, d: Partial<PlanAsignacion>) => api.patch<PlanAsignacion>(`/planificacion/asignaciones/${id}`, d).then(r => r.data),
     remove: (id: string) => api.delete(`/planificacion/asignaciones/${id}`),
+  },
+};
+
+export const inventario = {
+  articulos: {
+    list: (todos?: boolean) =>
+      api.get<InventarioArticulo[]>('/inventario/articulos', { params: todos ? { todos: 'true' } : {} }).then(r => r.data),
+    create: (data: Partial<InventarioArticulo>) =>
+      api.post<InventarioArticulo>('/inventario/articulos', data).then(r => r.data),
+    update: (id: string, data: Partial<InventarioArticulo>) =>
+      api.patch<InventarioArticulo>(`/inventario/articulos/${id}`, data).then(r => r.data),
+    ajustarStock: (id: string, cantidad: number) =>
+      api.patch<InventarioArticulo>(`/inventario/articulos/${id}/stock`, { cantidad }).then(r => r.data),
+    remove: (id: string) => api.delete(`/inventario/articulos/${id}`),
+  },
+  visita: {
+    list: (visitaId: string) =>
+      api.get<VisitaArticulo[]>(`/inventario/visita/${visitaId}`).then(r => r.data),
+    add: (visitaId: string, data: { articulo_id: string; cantidad: number; precioUnitario?: number; notas?: string }) =>
+      api.post<VisitaArticulo>(`/inventario/visita/${visitaId}`, data).then(r => r.data),
+    remove: (lineaId: string) => api.delete(`/inventario/visita/linea/${lineaId}`),
   },
 };
 

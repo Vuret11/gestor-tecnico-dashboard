@@ -18,13 +18,14 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
     telefono: item?.telefono ?? '',
     notas: item?.notas ?? '',
     tipoInstalacion: item?.tipoInstalacion ?? '' as string,
+    importe: item?.importe != null ? String(item.importe) : '',
   });
 
   const save = useMutation({
     mutationFn: () => {
-      const data = Object.fromEntries(
-        Object.entries(form).filter(([, v]) => v !== ''),
-      ) as Partial<Instalacion>;
+      const raw = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '')) as any;
+      if (raw.importe !== undefined) raw.importe = Number(raw.importe);
+      const data = raw as Partial<Instalacion>;
       return item ? api.update(item.id, data) : api.create(data);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['instalaciones'] }); onClose(); },
@@ -88,6 +89,11 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Teléfono</label>
             <input type="tel" value={form.telefono} onChange={set('telefono')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Importe instalación (€)</label>
+            <input type="number" min="0" step="0.01" value={form.importe} onChange={set('importe')} placeholder="—"
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
           <div>

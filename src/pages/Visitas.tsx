@@ -1,10 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi, checklists as checklistsApi } from '../api/endpoints';
-import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2, Pencil, AlertTriangle, Plane } from 'lucide-react';
+import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi, checklists as checklistsApi, inventario as inventarioApi } from '../api/endpoints';
+import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2, Pencil, AlertTriangle, Plane, Package } from 'lucide-react';
 import Badge from '../components/ui/Badge';
-import type { TipoVisita, EstadoVisita, Visita } from '../types';
+import type { TipoVisita, EstadoVisita, Visita, InventarioArticulo, VisitaArticulo } from '../types';
 
 const TIPO_LABELS: Record<TipoVisita, string> = {
   visita_tecnica_fv: 'V.T. Fotovoltaica',
@@ -54,6 +54,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     notas: editing?.notas ?? '',
     modalidad: editing?.modalidad ?? '',
     viaja: editing?.viaja ?? false,
+    importeExtras: editing?.importeExtras != null ? String(editing.importeExtras) : '',
     plantillaId: '',
   });
   const [busqInst, setBusqInst] = useState('');
@@ -83,6 +84,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     const d: any = { ...rest };
     if (!d.modalidad) delete d.modalidad;
     if (!d.viaja) delete d.viaja;
+    if (d.importeExtras !== '' && d.importeExtras != null) d.importeExtras = Number(d.importeExtras);
+    else delete d.importeExtras;
     return d;
   };
 
@@ -255,6 +258,13 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
 
+          {/* Importe extras */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Importe extras / materiales (€)</label>
+            <input type="number" min="0" step="0.01" value={form.importeExtras} onChange={set('importeExtras')} placeholder="—"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          </div>
+
           {/* Notas */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Notas</label>
@@ -339,6 +349,37 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
     queryKey: ['fotos-visita', visita.id],
     queryFn: () => fotosApi.porVisita(visita.id),
   });
+  const { data: articulos = [], refetch: refetchArticulos } = useQuery({
+    queryKey: ['visita-articulos', visita.id],
+    queryFn: () => inventarioApi.visita.list(visita.id),
+  });
+  const { data: articulosDisp = [] } = useQuery({
+    queryKey: ['inventario'],
+    queryFn: () => inventarioApi.articulos.list(),
+  });
+  const [showAddArticulo, setShowAddArticulo] = useState(false);
+  const [selArticuloId, setSelArticuloId] = useState('');
+  const [cantArticulo, setCantArticulo] = useState('1');
+  const [addingArticulo, setAddingArticulo] = useState(false);
+
+  const addArticulo = async () => {
+    if (!selArticuloId || !cantArticulo) return;
+    setAddingArticulo(true);
+    try {
+      await inventarioApi.visita.add(visita.id, { articulo_id: selArticuloId, cantidad: Number(cantArticulo) });
+      await refetchArticulos();
+      qc.invalidateQueries({ queryKey: ['inventario'] });
+      setSelArticuloId(''); setCantArticulo('1'); setShowAddArticulo(false);
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? 'Error al añadir artículo');
+    } finally { setAddingArticulo(false); }
+  };
+
+  const removeArticulo = useMutation({
+    mutationFn: (id: string) => inventarioApi.visita.remove(id),
+    onSuccess: () => { refetchArticulos(); qc.invalidateQueries({ queryKey: ['inventario'] }); },
+  });
+
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -451,6 +492,73 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
             <div className="col-span-2">
               <p className="text-slate-400 mb-0.5">Notas</p>
               <p className="text-slate-700">{visita.notas}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Inventario materiales */}
+        <div className="px-5 py-3 border-b border-slate-100 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+              <Package size={12} /> Materiales usados {(articulos as VisitaArticulo[]).length > 0 && `(${(articulos as VisitaArticulo[]).length})`}
+            </p>
+            <button onClick={() => setShowAddArticulo(v => !v)}
+              className="text-xs text-brand hover:underline flex items-center gap-1">
+              <Plus size={12} /> Añadir
+            </button>
+          </div>
+
+          {showAddArticulo && (
+            <div className="bg-slate-50 rounded-lg p-3 space-y-2 border border-slate-200">
+              <div className="flex gap-2">
+                <select value={selArticuloId} onChange={e => setSelArticuloId(e.target.value)}
+                  className="flex-1 border border-slate-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand bg-white">
+                  <option value="">— Artículo —</option>
+                  {(articulosDisp as InventarioArticulo[]).map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre} (stock: {Number(a.stockActual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                    </option>
+                  ))}
+                </select>
+                <input type="number" min="0.001" step="0.001" value={cantArticulo} onChange={e => setCantArticulo(e.target.value)}
+                  placeholder="Cant." className="w-20 border border-slate-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand" />
+                <button onClick={addArticulo} disabled={addingArticulo || !selArticuloId}
+                  className="text-xs bg-brand text-white rounded px-3 py-1.5 hover:bg-brand-dark disabled:opacity-50">
+                  {addingArticulo ? '...' : 'OK'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(articulos as VisitaArticulo[]).length > 0 && (
+            <div className="space-y-1">
+              {(articulos as VisitaArticulo[]).map(va => (
+                <div key={va.id} className="flex items-center justify-between text-xs bg-white border border-slate-100 rounded px-2 py-1.5">
+                  <div>
+                    <span className="font-medium text-slate-800">{va.articulo?.nombre}</span>
+                    <span className="text-slate-400 ml-1.5">
+                      × {Number(va.cantidad).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {va.articulo?.unidad}
+                    </span>
+                    {va.precioUnitario != null && (
+                      <span className="text-slate-400 ml-1.5">
+                        ({(Number(va.precioUnitario) * Number(va.cantidad)).toFixed(2)} €)
+                      </span>
+                    )}
+                  </div>
+                  <button onClick={() => removeArticulo.mutate(va.id)} className="text-slate-300 hover:text-red-500 p-0.5">
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+              {/* Total */}
+              {(articulos as VisitaArticulo[]).some(va => va.precioUnitario != null) && (
+                <div className="text-xs text-right text-slate-600 font-medium pt-1">
+                  Total materiales:{' '}
+                  {(articulos as VisitaArticulo[]).reduce((s, va) =>
+                    s + (va.precioUnitario != null ? Number(va.precioUnitario) * Number(va.cantidad) : 0), 0
+                  ).toFixed(2)} €
+                </div>
+              )}
             </div>
           )}
         </div>
