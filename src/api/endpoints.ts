@@ -147,6 +147,13 @@ export const inventario = {
       api.post<VisitaArticulo>(`/inventario/visita/${visitaId}`, data).then(r => r.data),
     remove: (lineaId: string) => api.delete(`/inventario/visita/linea/${lineaId}`),
   },
+  historial: (desde?: string, hasta?: string) =>
+    api.get<VisitaArticulo[]>('/inventario/historial', { params: { desde, hasta } }).then(r => r.data),
+};
+
+export const stats = {
+  kpisTecnicos: (desde?: string, hasta?: string) =>
+    api.get<any[]>('/stats/kpis-tecnicos', { params: { desde, hasta } }).then(r => r.data),
 };
 
 export const repositorio = {

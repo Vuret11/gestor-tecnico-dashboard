@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { visitas as visitasApi, incidencias as incidenciasApi, users as usersApi } from '../api/endpoints';
-import type { Visita, Incidencia } from '../types';
+import { visitas as visitasApi, incidencias as incidenciasApi, users as usersApi, inventario as inventarioApi, stats as statsApi } from '../api/endpoints';
+import type { Visita, Incidencia, VisitaArticulo } from '../types';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Download, ChevronLeft, ChevronRight, CalendarCheck, AlertTriangle, Zap, Wrench, Users } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, CalendarCheck, AlertTriangle, Zap, Wrench, Users, Package, Clock } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AuditoriaPDFButton } from '../components/AuditoriaPDF';
 
@@ -24,6 +24,7 @@ const TIPOS = [
 ];
 
 type Periodo = 'semana' | 'mes' | 'año';
+type Vista = 'actividad' | 'kpis' | 'inventario';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getWeekStart(d: Date): Date {
@@ -49,11 +50,43 @@ function buildFila(label: string, v: Visita[], inc: Incidencia[]) {
   };
 }
 
-function exportExcel(filas: object[], filasTecnicos: object[], titulo: string) {
+function exportActividad(filas: object[], filasTecnicos: object[], titulo: string) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Desglose por período');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filasTecnicos), 'Técnicos');
   XLSX.writeFile(wb, `auditoria_${titulo.replace(/[\s/]/g, '_')}.xlsx`);
+}
+
+function exportKpis(kpis: any[], titulo: string) {
+  const filas = kpis.map(k => ({
+    Técnico: k.tecnico.nombre,
+    Email: k.tecnico.email,
+    'Visitas totales': k.visitas.total,
+    Completadas: k.visitas.completadas,
+    'Horas trabajadas': k.horas,
+    'Instalaciones únicas': k.instalaciones,
+    Incidencias: k.incidencias,
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'KPIs Técnicos');
+  XLSX.writeFile(wb, `kpis_tecnicos_${titulo.replace(/[\s/]/g, '_')}.xlsx`);
+}
+
+function exportHistorial(historial: VisitaArticulo[], titulo: string) {
+  const filas = historial.map((h: any) => ({
+    Fecha: h.createdAt ? new Date(h.createdAt).toLocaleDateString('es-ES') : '—',
+    Instalación: h.visita?.instalacion?.nombre ?? '—',
+    Técnico: h.visita?.tecnico?.nombre ?? '—',
+    Artículo: h.articulo?.nombre ?? '—',
+    Referencia: h.articulo?.referencia ?? '—',
+    Unidad: h.articulo?.unidad ?? '—',
+    Cantidad: Number(h.cantidad),
+    'Precio unitario': h.precioUnitario ? Number(h.precioUnitario) : '—',
+    Total: h.precioUnitario ? Math.round(Number(h.precioUnitario) * Number(h.cantidad) * 100) / 100 : '—',
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Historial Inventario');
+  XLSX.writeFile(wb, `inventario_historial_${titulo.replace(/[\s/]/g, '_')}.xlsx`);
 }
 
 // ── Componente KPI ────────────────────────────────────────────────────────────
@@ -77,6 +110,7 @@ export default function Auditorias() {
   const [periodo, setPeriodo] = useState<Periodo>('mes');
   const [cursor, setCursor] = useState(new Date());
   const [tipoFiltro, setTipoFiltro] = useState('todos');
+  const [vista, setVista] = useState<Vista>('actividad');
 
   const { data: visitas = [] } = useQuery({ queryKey: ['visitas'], queryFn: visitasApi.list });
   const { data: incidencias = [] } = useQuery({ queryKey: ['incidencias'], queryFn: incidenciasApi.list });
@@ -114,6 +148,19 @@ export default function Auditorias() {
     };
   }, [periodo, cursor]);
 
+  // Queries que dependen del rango de fechas
+  const { data: kpisTecnicos = [], isFetching: kpisLoading } = useQuery({
+    queryKey: ['kpis-tecnicos', desde.toISOString(), hasta.toISOString()],
+    queryFn: () => statsApi.kpisTecnicos(desde.toISOString(), hasta.toISOString()),
+    enabled: vista === 'kpis',
+  });
+
+  const { data: historial = [], isFetching: historialLoading } = useQuery({
+    queryKey: ['inventario-historial', desde.toISOString(), hasta.toISOString()],
+    queryFn: () => inventarioApi.historial(desde.toISOString(), hasta.toISOString()),
+    enabled: vista === 'inventario',
+  });
+
   // Navegación
   function navPrev() {
     const d = new Date(cursor);
@@ -130,7 +177,7 @@ export default function Auditorias() {
     setCursor(d);
   }
 
-  // Datos filtrados
+  // Datos filtrados (actividad)
   const visitasFiltradas = useMemo(() => {
     let v = visitas.filter(x => {
       const d = new Date(x.fechaProgramada);
@@ -189,7 +236,7 @@ export default function Auditorias() {
   const totalInc = incidenciasFiltradas.length;
   const incResueltas = incidenciasFiltradas.filter(i => i.estado === 'cerrada' || i.estado === 'resuelta').length;
 
-  // Datos gráfico (solo filas con actividad o todas si son pocas)
+  // Datos gráfico
   const chartData = (periodo === 'mes'
     ? filas.filter(f => f['Total visitas'] > 0 || f['Incidencias'] > 0)
     : filas
@@ -231,6 +278,12 @@ export default function Auditorias() {
     { label: '% completado', value: totalVisitas ? `${Math.round(completadas / totalVisitas * 100)}%` : '—' },
   ];
 
+  const VISTAS = [
+    { id: 'actividad' as Vista, label: 'Actividad', icon: CalendarCheck },
+    { id: 'kpis' as Vista, label: 'KPIs Técnicos', icon: Clock },
+    { id: 'inventario' as Vista, label: 'Historial Inventario', icon: Package },
+  ];
+
   return (
     <div className="p-6 space-y-5">
 
@@ -266,117 +319,210 @@ export default function Auditorias() {
             </button>
           </div>
 
-          {/* Filtro tipo */}
-          <select
-            value={tipoFiltro}
-            onChange={e => setTipoFiltro(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand"
-          >
-            {TIPOS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-          </select>
+          {/* Filtro tipo — solo en actividad */}
+          {vista === 'actividad' && (
+            <select
+              value={tipoFiltro}
+              onChange={e => setTipoFiltro(e.target.value)}
+              className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand"
+            >
+              {TIPOS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+            </select>
+          )}
 
           {/* Exportar */}
+          {vista === 'actividad' && (
+            <>
+              <button
+                onClick={() => exportActividad(filas, tecnicoRows, titulo)}
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
+              >
+                <Download size={15} /> Excel
+              </button>
+              <AuditoriaPDFButton
+                titulo={titulo}
+                subtitulo={subtitulo}
+                tipoLabel={tipoLabel}
+                filas={filas}
+                kpis={kpisForPDF}
+                tecnicoFilas={tecnicoRows}
+              />
+            </>
+          )}
+          {vista === 'kpis' && (
+            <button
+              onClick={() => exportKpis(kpisTecnicos, titulo)}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
+            >
+              <Download size={15} /> Excel
+            </button>
+          )}
+          {vista === 'inventario' && (
+            <button
+              onClick={() => exportHistorial(historial as any, titulo)}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
+            >
+              <Download size={15} /> Excel
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs de vista */}
+      <div className="flex border-b border-slate-200 bg-white rounded-t-xl overflow-hidden">
+        {VISTAS.map(({ id, label, icon: Icon }) => (
           <button
-            onClick={() => exportExcel(filas, tecnicoRows, titulo)}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
+            key={id}
+            onClick={() => setVista(id)}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors border-b-2 ${
+              vista === id
+                ? 'border-brand text-brand bg-brand/5'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
           >
-            <Download size={15} /> Excel
+            <Icon size={15} />
+            {label}
           </button>
-          <AuditoriaPDFButton
-            titulo={titulo}
-            subtitulo={subtitulo}
-            tipoLabel={tipoLabel}
-            filas={filas}
-            kpis={kpisForPDF}
-            tecnicoFilas={tecnicoRows}
-          />
-        </div>
+        ))}
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiCard label="Visitas totales" value={totalVisitas}
-          sub={`${completadas} completadas (${totalVisitas ? Math.round(completadas / totalVisitas * 100) : 0}%)`}
-          icon={CalendarCheck} color="bg-blue-500" />
-        <KpiCard label="Instalaciones nuevas" value={instNuevas}
-          sub="FV + Rite"
-          icon={Zap} color="bg-amber-500" />
-        <KpiCard label="Visitas técnicas" value={totalVisitas - instNuevas}
-          sub="FV + Rite"
-          icon={Wrench} color="bg-cyan-500" />
-        <KpiCard label="Incidencias" value={totalInc}
-          sub={`${incResueltas} resueltas`}
-          icon={AlertTriangle} color="bg-red-500" />
-      </div>
-
-      {/* Gráfico */}
-      {chartData.some(d => d.Visitas > 0 || d.Incidencias > 0) && (
-        <div className="bg-white rounded-xl border border-slate-200">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h2 className="font-medium text-slate-900">Actividad — {titulo}</h2>
+      {/* ── Vista: Actividad ─────────────────────────────────────────────── */}
+      {vista === 'actividad' && (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <KpiCard label="Visitas totales" value={totalVisitas}
+              sub={`${completadas} completadas (${totalVisitas ? Math.round(completadas / totalVisitas * 100) : 0}%)`}
+              icon={CalendarCheck} color="bg-blue-500" />
+            <KpiCard label="Instalaciones nuevas" value={instNuevas}
+              sub="FV + Rite"
+              icon={Zap} color="bg-amber-500" />
+            <KpiCard label="Visitas técnicas" value={totalVisitas - instNuevas}
+              sub="FV + Rite"
+              icon={Wrench} color="bg-cyan-500" />
+            <KpiCard label="Incidencias" value={totalInc}
+              sub={`${incResueltas} resueltas`}
+              icon={AlertTriangle} color="bg-red-500" />
           </div>
-          <div className="p-4">
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData} barSize={14}>
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="Visitas" fill="#dbeafe" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="Completadas" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="Incidencias" fill="#f87171" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
 
-      {/* Tabla técnicos */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-          <Users size={16} className="text-slate-400" />
-          <h2 className="font-medium text-slate-900">Rendimiento por técnico</h2>
-          <span className="ml-auto text-xs text-slate-400">{tecnicoRows.length} técnicos con actividad</span>
-        </div>
-        {tecnicoRows.length === 0
-          ? <p className="px-5 py-8 text-sm text-slate-400 text-center">Sin visitas en este período</p>
-          : (
+          {/* Gráfico */}
+          {chartData.some(d => d.Visitas > 0 || d.Incidencias > 0) && (
+            <div className="bg-white rounded-xl border border-slate-200">
+              <div className="px-5 py-4 border-b border-slate-100">
+                <h2 className="font-medium text-slate-900">Actividad — {titulo}</h2>
+              </div>
+              <div className="p-4">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={chartData} barSize={14}>
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="Visitas" fill="#dbeafe" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="Completadas" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="Incidencias" fill="#f87171" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Tabla técnicos */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+              <Users size={16} className="text-slate-400" />
+              <h2 className="font-medium text-slate-900">Rendimiento por técnico</h2>
+              <span className="ml-auto text-xs text-slate-400">{tecnicoRows.length} técnicos con actividad</span>
+            </div>
+            {tecnicoRows.length === 0
+              ? <p className="px-5 py-8 text-sm text-slate-400 text-center">Sin visitas en este período</p>
+              : (
+                <table className="w-full text-xs min-w-[700px]">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      {['Técnico', 'Total', 'Complet.', 'Cancel.', 'V.T. FV', 'V.T. Aero', 'Inst. FV', 'Inst. Aero', '% Completado'].map(h => (
+                        <th key={h} className="px-3 py-2.5 text-left font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {tecnicoRows.map((t, i) => {
+                      const pct = t.Total ? Math.round(t['Completadas'] / t.Total * 100) : 0;
+                      return (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-3 py-3 font-medium text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
+                                <span className="text-brand text-[10px] font-bold">{t.Técnico[0]}</span>
+                              </div>
+                              {t.Técnico}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 font-semibold text-slate-900">{t.Total}</td>
+                          <td className="px-3 py-3 text-green-600">{t['Completadas'] || '—'}</td>
+                          <td className="px-3 py-3 text-slate-400">{t['Canceladas'] || '—'}</td>
+                          <td className="px-3 py-3 text-blue-600">{t['V.T. FV'] || '—'}</td>
+                          <td className="px-3 py-3 text-cyan-600">{t['V.T. Rite'] || '—'}</td>
+                          <td className="px-3 py-3 text-amber-600">{t['Inst. FV'] || '—'}</td>
+                          <td className="px-3 py-3 text-orange-600">{t['Inst. Rite'] || '—'}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden min-w-[60px]">
+                                <div className="h-full bg-brand rounded-full transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-slate-700 font-medium w-8 text-right">{pct}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
+                    <tr>
+                      <td className="px-3 py-2.5 text-slate-700">TOTAL</td>
+                      <td className="px-3 py-2.5">{tecnicoRows.reduce((s, t) => s + t.Total, 0)}</td>
+                      <td className="px-3 py-2.5 text-green-600">{tecnicoRows.reduce((s, t) => s + t['Completadas'], 0)}</td>
+                      <td className="px-3 py-2.5 text-slate-400">{tecnicoRows.reduce((s, t) => s + t['Canceladas'], 0) || '—'}</td>
+                      <td className="px-3 py-2.5 text-blue-600">{tecnicoRows.reduce((s, t) => s + t['V.T. FV'], 0) || '—'}</td>
+                      <td className="px-3 py-2.5 text-cyan-600">{tecnicoRows.reduce((s, t) => s + t['V.T. Rite'], 0) || '—'}</td>
+                      <td className="px-3 py-2.5 text-amber-600">{tecnicoRows.reduce((s, t) => s + t['Inst. FV'], 0) || '—'}</td>
+                      <td className="px-3 py-2.5 text-orange-600">{tecnicoRows.reduce((s, t) => s + t['Inst. Rite'], 0) || '—'}</td>
+                      <td className="px-3 py-2.5" />
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+          </div>
+
+          {/* Tabla desglose */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="font-medium text-slate-900">Desglose — {tipoLabel}</h2>
+              <span className="text-xs text-slate-400">{filas.filter(f => f['Total visitas'] > 0).length} períodos con actividad</span>
+            </div>
             <table className="w-full text-xs min-w-[700px]">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  {['Técnico', 'Total', 'Complet.', 'Cancel.', 'V.T. FV', 'V.T. Aero', 'Inst. FV', 'Inst. Aero', '% Completado'].map(h => (
+                  {['Período', 'Visitas', 'Complet.', 'Cancel.', 'V.T. FV', 'V.T. Aero', 'Inst. FV', 'Inst. Aero', 'Incid.', 'Críticas'].map(h => (
                     <th key={h} className="px-3 py-2.5 text-left font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {tecnicoRows.map((t, i) => {
-                  const pct = t.Total ? Math.round(t['Completadas'] / t.Total * 100) : 0;
+                {filas.map((f, i) => {
+                  const sinActividad = f['Total visitas'] === 0 && f['Incidencias'] === 0;
                   return (
-                    <tr key={i} className="hover:bg-slate-50">
-                      <td className="px-3 py-3 font-medium text-slate-900">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
-                            <span className="text-brand text-[10px] font-bold">{t.Técnico[0]}</span>
-                          </div>
-                          {t.Técnico}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 font-semibold text-slate-900">{t.Total}</td>
-                      <td className="px-3 py-3 text-green-600">{t['Completadas'] || '—'}</td>
-                      <td className="px-3 py-3 text-slate-400">{t['Canceladas'] || '—'}</td>
-                      <td className="px-3 py-3 text-blue-600">{t['V.T. FV'] || '—'}</td>
-                      <td className="px-3 py-3 text-cyan-600">{t['V.T. Rite'] || '—'}</td>
-                      <td className="px-3 py-3 text-amber-600">{t['Inst. FV'] || '—'}</td>
-                      <td className="px-3 py-3 text-orange-600">{t['Inst. Rite'] || '—'}</td>
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden min-w-[60px]">
-                            <div className="h-full bg-brand rounded-full transition-all" style={{ width: `${pct}%` }} />
-                          </div>
-                          <span className="text-slate-700 font-medium w-8 text-right">{pct}%</span>
-                        </div>
-                      </td>
+                    <tr key={i} className={sinActividad ? 'opacity-40' : 'hover:bg-slate-50'}>
+                      <td className="px-3 py-2.5 font-medium text-slate-700 whitespace-nowrap">{f.Período}</td>
+                      <td className="px-3 py-2.5 font-semibold text-slate-900">{f['Total visitas'] || '—'}</td>
+                      <td className="px-3 py-2.5 text-green-600">{f['Completadas'] || '—'}</td>
+                      <td className="px-3 py-2.5 text-slate-400">{f['Canceladas'] || '—'}</td>
+                      <td className="px-3 py-2.5 text-blue-600">{f['V.T. FV'] || '—'}</td>
+                      <td className="px-3 py-2.5 text-cyan-600">{f['V.T. Rite'] || '—'}</td>
+                      <td className="px-3 py-2.5 text-amber-600">{f['Inst. FV'] || '—'}</td>
+                      <td className="px-3 py-2.5 text-orange-600">{f['Inst. Rite'] || '—'}</td>
+                      <td className="px-3 py-2.5 text-red-500">{f['Incidencias'] || '—'}</td>
+                      <td className="px-3 py-2.5 text-red-700 font-medium">{f['Inc. críticas'] || '—'}</td>
                     </tr>
                   );
                 })}
@@ -384,65 +530,139 @@ export default function Auditorias() {
               <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
                 <tr>
                   <td className="px-3 py-2.5 text-slate-700">TOTAL</td>
-                  <td className="px-3 py-2.5">{tecnicoRows.reduce((s, t) => s + t.Total, 0)}</td>
-                  <td className="px-3 py-2.5 text-green-600">{tecnicoRows.reduce((s, t) => s + t['Completadas'], 0)}</td>
-                  <td className="px-3 py-2.5 text-slate-400">{tecnicoRows.reduce((s, t) => s + t['Canceladas'], 0) || '—'}</td>
-                  <td className="px-3 py-2.5 text-blue-600">{tecnicoRows.reduce((s, t) => s + t['V.T. FV'], 0) || '—'}</td>
-                  <td className="px-3 py-2.5 text-cyan-600">{tecnicoRows.reduce((s, t) => s + t['V.T. Rite'], 0) || '—'}</td>
-                  <td className="px-3 py-2.5 text-amber-600">{tecnicoRows.reduce((s, t) => s + t['Inst. FV'], 0) || '—'}</td>
-                  <td className="px-3 py-2.5 text-orange-600">{tecnicoRows.reduce((s, t) => s + t['Inst. Rite'], 0) || '—'}</td>
-                  <td className="px-3 py-2.5" />
+                  {(['Total visitas', 'Completadas', 'Canceladas', 'V.T. FV', 'V.T. Rite', 'Inst. FV', 'Inst. Rite', 'Incidencias', 'Inc. críticas'] as const).map(k => (
+                    <td key={k} className="px-3 py-2.5 text-slate-900">
+                      {filas.reduce((s, f) => s + (Number(f[k]) || 0), 0) || '—'}
+                    </td>
+                  ))}
                 </tr>
               </tfoot>
             </table>
-          )}
-      </div>
+          </div>
+        </>
+      )}
 
-      {/* Tabla desglose */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="font-medium text-slate-900">Desglose — {tipoLabel}</h2>
-          <span className="text-xs text-slate-400">{filas.filter(f => f['Total visitas'] > 0).length} períodos con actividad</span>
+      {/* ── Vista: KPIs Técnicos ─────────────────────────────────────────── */}
+      {vista === 'kpis' && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+            <Clock size={16} className="text-slate-400" />
+            <h2 className="font-medium text-slate-900">KPIs por técnico — {titulo}</h2>
+            <span className="ml-auto text-xs text-slate-400">{kpisTecnicos.length} técnicos</span>
+          </div>
+          {kpisLoading
+            ? <p className="px-5 py-8 text-sm text-slate-400 text-center">Cargando...</p>
+            : kpisTecnicos.length === 0
+              ? <p className="px-5 py-8 text-sm text-slate-400 text-center">Sin datos en este período</p>
+              : (
+                <table className="w-full text-xs min-w-[700px]">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      {['Técnico', 'Visitas totales', 'Completadas', 'Horas trabajadas', 'Instalaciones únicas', 'Incidencias'].map(h => (
+                        <th key={h} className="px-3 py-2.5 text-left font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {kpisTecnicos.map((k: any, i: number) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="px-3 py-3 font-medium text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
+                              <span className="text-brand text-[10px] font-bold">{k.tecnico.nombre[0]}</span>
+                            </div>
+                            {k.tecnico.nombre}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 font-semibold text-slate-900">{k.visitas.total}</td>
+                        <td className="px-3 py-3 text-green-600">{k.visitas.completadas || '—'}</td>
+                        <td className="px-3 py-3">
+                          <span className="inline-flex items-center gap-1 text-blue-700 font-medium">
+                            <Clock size={11} />
+                            {k.horas > 0 ? `${k.horas}h` : '—'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-slate-700">{k.instalaciones || '—'}</td>
+                        <td className="px-3 py-3 text-red-500">{k.incidencias || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
+                    <tr>
+                      <td className="px-3 py-2.5 text-slate-700">TOTAL</td>
+                      <td className="px-3 py-2.5">{kpisTecnicos.reduce((s: number, k: any) => s + k.visitas.total, 0)}</td>
+                      <td className="px-3 py-2.5 text-green-600">{kpisTecnicos.reduce((s: number, k: any) => s + k.visitas.completadas, 0)}</td>
+                      <td className="px-3 py-2.5 text-blue-700">{kpisTecnicos.reduce((s: number, k: any) => s + k.horas, 0).toFixed(1)}h</td>
+                      <td className="px-3 py-2.5">—</td>
+                      <td className="px-3 py-2.5 text-red-500">{kpisTecnicos.reduce((s: number, k: any) => s + k.incidencias, 0)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
         </div>
-        <table className="w-full text-xs min-w-[700px]">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              {['Período', 'Visitas', 'Complet.', 'Cancel.', 'V.T. FV', 'V.T. Aero', 'Inst. FV', 'Inst. Aero', 'Incid.', 'Críticas'].map(h => (
-                <th key={h} className="px-3 py-2.5 text-left font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filas.map((f, i) => {
-              const sinActividad = f['Total visitas'] === 0 && f['Incidencias'] === 0;
-              return (
-                <tr key={i} className={sinActividad ? 'opacity-40' : 'hover:bg-slate-50'}>
-                  <td className="px-3 py-2.5 font-medium text-slate-700 whitespace-nowrap">{f.Período}</td>
-                  <td className="px-3 py-2.5 font-semibold text-slate-900">{f['Total visitas'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-green-600">{f['Completadas'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-slate-400">{f['Canceladas'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-blue-600">{f['V.T. FV'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-cyan-600">{f['V.T. Rite'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-amber-600">{f['Inst. FV'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-orange-600">{f['Inst. Rite'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-red-500">{f['Incidencias'] || '—'}</td>
-                  <td className="px-3 py-2.5 text-red-700 font-medium">{f['Inc. críticas'] || '—'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
-            <tr>
-              <td className="px-3 py-2.5 text-slate-700">TOTAL</td>
-              {(['Total visitas', 'Completadas', 'Canceladas', 'V.T. FV', 'V.T. Rite', 'Inst. FV', 'Inst. Rite', 'Incidencias', 'Inc. críticas'] as const).map(k => (
-                <td key={k} className="px-3 py-2.5 text-slate-900">
-                  {filas.reduce((s, f) => s + (Number(f[k]) || 0), 0) || '—'}
-                </td>
-              ))}
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      )}
+
+      {/* ── Vista: Historial Inventario ──────────────────────────────────── */}
+      {vista === 'inventario' && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+            <Package size={16} className="text-slate-400" />
+            <h2 className="font-medium text-slate-900">Historial de materiales — {titulo}</h2>
+            <span className="ml-auto text-xs text-slate-400">{(historial as any[]).length} registros</span>
+          </div>
+          {historialLoading
+            ? <p className="px-5 py-8 text-sm text-slate-400 text-center">Cargando...</p>
+            : (historial as any[]).length === 0
+              ? <p className="px-5 py-8 text-sm text-slate-400 text-center">Sin materiales registrados en este período</p>
+              : (
+                <table className="w-full text-xs min-w-[900px]">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      {['Fecha', 'Instalación', 'Técnico', 'Artículo', 'Ref.', 'Ud.', 'Cantidad', 'P. Unit.', 'Total'].map(h => (
+                        <th key={h} className="px-3 py-2.5 text-left font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(historial as any[]).map((h, i) => {
+                      const total = h.precioUnitario ? Number(h.precioUnitario) * Number(h.cantidad) : null;
+                      return (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+                            {h.createdAt ? new Date(h.createdAt).toLocaleDateString('es-ES') : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 font-medium text-slate-800 max-w-[150px] truncate">
+                            {h.visita?.instalacion?.nombre ?? '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-600">{h.visita?.tecnico?.nombre ?? '—'}</td>
+                          <td className="px-3 py-2.5 font-medium text-slate-900">{h.articulo?.nombre ?? '—'}</td>
+                          <td className="px-3 py-2.5 text-slate-400">{h.articulo?.referencia ?? '—'}</td>
+                          <td className="px-3 py-2.5 text-slate-400">{h.articulo?.unidad ?? '—'}</td>
+                          <td className="px-3 py-2.5 font-semibold text-slate-900">{Number(h.cantidad)}</td>
+                          <td className="px-3 py-2.5 text-slate-600">
+                            {h.precioUnitario ? `${Number(h.precioUnitario).toFixed(2)} €` : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 font-medium text-slate-900">
+                            {total !== null ? `${total.toFixed(2)} €` : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
+                    <tr>
+                      <td colSpan={6} className="px-3 py-2.5 text-slate-700">TOTAL</td>
+                      <td className="px-3 py-2.5">{(historial as any[]).reduce((s, h) => s + Number(h.cantidad), 0)}</td>
+                      <td className="px-3 py-2.5">—</td>
+                      <td className="px-3 py-2.5 text-slate-900">
+                        {(historial as any[]).reduce((s, h) => s + (h.precioUnitario ? Number(h.precioUnitario) * Number(h.cantidad) : 0), 0).toFixed(2)} €
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+        </div>
+      )}
     </div>
   );
 }

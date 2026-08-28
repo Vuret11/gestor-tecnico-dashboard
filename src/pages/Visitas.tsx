@@ -42,7 +42,10 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
   const qc = useQueryClient();
   const { data: insts = [] } = useQuery({ queryKey: ['instalaciones'], queryFn: instApi.list });
   const { data: users = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
+  const { data: articulosTodos = [] } = useQuery({ queryKey: ['inventario-all'], queryFn: () => inventarioApi.articulos.list() });
   const tecnicos = users.filter(u => u.rol === 'tecnico' && u.activo);
+  const paneles = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Panel Solar' && a.activo);
+  const inversores = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Inversor' && a.activo);
 
   const [form, setForm] = useState({
     instalacion_id: editing?.instalacion_id ?? '',
@@ -58,6 +61,10 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     plantillaId: '',
   });
   const [busqInst, setBusqInst] = useState('');
+  const [panelId, setPanelId] = useState('');
+  const [panelCant, setPanelCant] = useState('1');
+  const [inversorId, setInversorId] = useState('');
+  const [inversorCant, setInversorCant] = useState('1');
   const [adjuntos, setAdjuntos] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -100,6 +107,14 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
       setSaveError('');
       if (!editing && form.plantillaId) {
         try { await checklistsApi.asignar(visita.id, form.plantillaId); } catch { /* non-fatal */ }
+      }
+      if (!editing) {
+        const stockOps = [];
+        if (panelId && Number(panelCant) > 0)
+          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: panelId, cantidad: Number(panelCant) }));
+        if (inversorId && Number(inversorCant) > 0)
+          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: inversorId, cantidad: Number(inversorCant) }));
+        if (stockOps.length > 0) await Promise.allSettled(stockOps);
       }
       if (!editing && adjuntos.length > 0) {
         setUploading(true);
@@ -264,6 +279,50 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
             <input type="number" min="0" step="0.01" value={form.importeExtras} onChange={set('importeExtras')} placeholder="—"
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
+
+          {/* Paneles solares (solo al crear) */}
+          {!editing && paneles.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Panel Solar (descuenta stock)</label>
+              <div className="flex gap-2">
+                <select value={panelId} onChange={e => setPanelId(e.target.value)}
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
+                  <option value="">— Ninguno —</option>
+                  {paneles.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre} (stock: {Number(a.stockActual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                    </option>
+                  ))}
+                </select>
+                {panelId && (
+                  <input type="number" min="1" step="1" value={panelCant} onChange={e => setPanelCant(e.target.value)}
+                    placeholder="Cant." className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Inversores (solo al crear) */}
+          {!editing && inversores.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Inversor (descuenta stock)</label>
+              <div className="flex gap-2">
+                <select value={inversorId} onChange={e => setInversorId(e.target.value)}
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
+                  <option value="">— Ninguno —</option>
+                  {inversores.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre} (stock: {Number(a.stockActual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                    </option>
+                  ))}
+                </select>
+                {inversorId && (
+                  <input type="number" min="1" step="1" value={inversorCant} onChange={e => setInversorCant(e.target.value)}
+                    placeholder="Cant." className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Notas */}
           <div>
