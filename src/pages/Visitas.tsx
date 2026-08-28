@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi, checklists as checklistsApi } from '../api/endpoints';
 import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2, Pencil, AlertTriangle } from 'lucide-react';
@@ -555,6 +556,18 @@ export default function Visitas() {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Visita | null>(null);
   const [editing, setEditing] = useState<Visita | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Auto-abrir panel si viene ?id=xxx desde planificación
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id || data.length === 0) return;
+    const visita = data.find(v => v.id === id);
+    if (visita) {
+      setSelected(visita);
+      setSearchParams({}, { replace: true });
+    }
+  }, [data, searchParams]);
 
   // Búsqueda global
   const [busqueda, setBusqueda] = useState('');

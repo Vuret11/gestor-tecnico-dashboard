@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, Fragment, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { planificacion as api, visitas as visitasApi } from '../../api/endpoints';
 import type { PlanAsignacion, PlanTecnico, EstadoEspecial, Visita } from '../../types';
@@ -275,6 +276,7 @@ function AsignacionModal({
 
 export default function PlanSemanal() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [cursor, setCursor] = useState(new Date());
   const [provinciaId, setProvinciaId] = useState('');
   const [modal, setModal] = useState<{ tecnico: PlanTecnico; fecha: string; asignacion?: PlanAsignacion } | null>(null);
@@ -339,6 +341,8 @@ export default function PlanSemanal() {
       qc.invalidateQueries({ queryKey: ['plan-semana'] });
       qc.invalidateQueries({ queryKey: ['visitas-semana'] });
       qc.invalidateQueries({ queryKey: ['plan-conflictos'] });
+      qc.invalidateQueries({ queryKey: ['visitas'] });
+      qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
     },
   });
 
@@ -554,6 +558,7 @@ export default function PlanSemanal() {
                                       draggedVisitaId.current = null;
                                       draggedVisitaFechaProgramada.current = null;
                                     }}
+                                    onDoubleClick={() => navigate(`/visitas?id=${v.id}`)}
                                     className="rounded-md px-2 py-1.5 text-xs bg-amber-50 border border-amber-200 hover:border-amber-400 transition-colors cursor-grab active:cursor-grabbing"
                                   >
                                     <p className="font-bold text-slate-900 truncate">{v.instalacion?.nombre ?? '—'}</p>
