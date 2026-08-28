@@ -264,7 +264,7 @@ function InformeDocumento({ inf, onClose }: { inf: Informe; onClose: () => void 
                     />
                     {(foto.latitud || foto.descripcion) && (
                       <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1.5 py-0.5 truncate">
-                        {foto.descripcion || (foto.latitud ? `${foto.latitud?.toFixed(4)}, ${foto.longitud?.toFixed(4)}` : '')}
+                        {foto.descripcion || (foto.latitud ? `${Number(foto.latitud).toFixed(4)}, ${Number(foto.longitud).toFixed(4)}` : '')}
                       </div>
                     )}
                   </div>

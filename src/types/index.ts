@@ -60,6 +60,7 @@ export interface Visita {
   estado: EstadoVisita;
   notas?: string;
   modalidad?: 'nueva' | 'reforma';
+  viaja?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi, checklists as checklistsApi } from '../api/endpoints';
-import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2, Pencil, AlertTriangle } from 'lucide-react';
+import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2, Pencil, AlertTriangle, Plane } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import type { TipoVisita, EstadoVisita, Visita } from '../types';
 
@@ -53,6 +53,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     tipo: (editing?.tipo ?? 'visita_tecnica_fv') as TipoVisita,
     notas: editing?.notas ?? '',
     modalidad: editing?.modalidad ?? '',
+    viaja: editing?.viaja ?? false,
     plantillaId: '',
   });
   const [busqInst, setBusqInst] = useState('');
@@ -81,6 +82,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     const { plantillaId: _, ...rest } = form;
     const d: any = { ...rest };
     if (!d.modalidad) delete d.modalidad;
+    if (!d.viaja) delete d.viaja;
     return d;
   };
 
@@ -233,6 +235,18 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
               {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
             </select>
           </div>
+
+          {/* Viaja */}
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.viaja}
+              onChange={e => setForm(f => ({ ...f, viaja: e.target.checked }))}
+              className="rounded border-slate-300 text-red-500"
+            />
+            <Plane size={13} className="text-red-500" />
+            <span className="text-slate-700">Técnico viaja (desplazamiento)</span>
+          </label>
 
           {/* Fecha */}
           <div>

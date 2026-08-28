@@ -41,7 +41,10 @@ function getWeekStart(d: Date) {
 }
 
 function dateStr(d: Date) {
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function AsignacionCell({
@@ -386,7 +389,8 @@ export default function PlanSemanal() {
     visitasSemana.forEach(v => {
       const ptId = userIdToPlanTecnico.get(v.tecnico_id);
       if (!ptId) return;
-      const fecha = v.fechaProgramada.split('T')[0];
+      const d = new Date(v.fechaProgramada);
+      const fecha = dateStr(d);
       if (!m.has(ptId)) m.set(ptId, new Map());
       const fm = m.get(ptId)!;
       if (!fm.has(fecha)) fm.set(fecha, []);
