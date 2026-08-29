@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { planificacion as api } from '../../api/endpoints';
 import type { EstadoEspecial, EstadoObra } from '../../types';
-import { Users, Building2, CalendarCheck, AlertTriangle, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { Users, CalendarCheck, AlertTriangle, CheckCircle2, Clock, XCircle } from 'lucide-react';
 
 const DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
@@ -72,7 +72,6 @@ export default function PlanDashboard() {
   const asigConObra = asigSemana.filter(a => a.obra_id);
   const tecnicosConAsig = new Set(asigConObra.map(a => a.tecnico_id)).size;
   const tecnicosLibres = tecnicosActivos - tecnicosConAsig;
-  const obrasRealizadas = obras.filter(o => o.estado === 'realizada').length;
   const obrasPendientes = obras.filter(o => o.estado === 'pendiente' || o.estado === 'planificada').length;
 
   const provinciaActual = provincias.find(p => p.id === provinciaId);

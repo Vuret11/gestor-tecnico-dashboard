@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { users as usersApi } from '../api/endpoints';
 import type { User } from '../types';
 import { TODOS_LOS_MODULOS, MODULO_LABELS, type Modulo } from '../hooks/usePermissions';
-import { Shield, Check, X, Info, RotateCcw } from 'lucide-react';
+import { Check, X, Info, RotateCcw } from 'lucide-react';
 
 const ROL_DEFAULTS: Record<string, Modulo[]> = {
   admin: [...TODOS_LOS_MODULOS],

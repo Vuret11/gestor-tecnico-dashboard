@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientes as api, instalaciones as instApi } from '../api/endpoints';
 import type { Cliente, Instalacion } from '../types';
-import { ArrowLeft, Plus, Pencil, Trash2, MapPin, Building2, Phone, Mail, FileText } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, MapPin, Building2, Phone, Mail, FileText } from 'lucide-react';
 
 /* ── Modal editar partner ── */
 function PartnerModal({ item, onClose }: { item: Cliente; onClose: () => void }) {

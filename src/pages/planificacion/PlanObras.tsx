@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { planificacion as api } from '../../api/endpoints';
-import type { PlanObra, PlanProvincia, PlanCliente, EstadoObra, TipoTrabajo, InstalacionResumen } from '../../types';
+import type { PlanObra, PlanProvincia, PlanCliente, EstadoObra, TipoTrabajo } from '../../types';
 import { Plus, Pencil, Search, RefreshCw } from 'lucide-react';
 
 const ESTADO_COLOR: Record<EstadoObra, string> = {
@@ -20,7 +20,7 @@ const TIPO_LABELS: Record<TipoTrabajo, string> = {
   visita_tecnica: 'Visita técnica', otro: 'Otro',
 };
 
-function ObraModal({ item, provincias, clientes, onClose }: {
+function ObraModal({ item, provincias, onClose }: {
   item?: PlanObra; provincias: PlanProvincia[]; clientes: PlanCliente[]; onClose: () => void;
 }) {
   const qc = useQueryClient();

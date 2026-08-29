@@ -5,7 +5,7 @@ import type { Visita, Incidencia, VisitaArticulo } from '../types';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Download, ChevronLeft, ChevronRight, CalendarCheck, AlertTriangle, Zap, Wrench, Users, Package, Clock, BarChart2, TrendingUp } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, CalendarCheck, AlertTriangle, Zap, Wrench, Users, Package, Clock, BarChart2, TrendingUp, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AuditoriaPDFButton } from '../components/AuditoriaPDF';
 
@@ -308,7 +308,7 @@ export default function Auditorias() {
     return true;
   });
   const crmCategorias = [...new Set(histRaw.map((h: any) => h.articulo?.categoria).filter(Boolean))].sort() as string[];
-  const crmTecnicos = [...new Map(histRaw.map((h: any) => [h.visita?.tecnico?.id, h.visita?.tecnico?.nombre]).filter(([id]) => id)).entries()]
+  const crmTecnicos = [...new Map(histRaw.map((h: any): [string, string] => [h.visita?.tecnico?.id, h.visita?.tecnico?.nombre]).filter(([id]) => id)).entries()]
     .map(([id, nombre]) => ({ id, nombre }))
     .sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? ''));
 

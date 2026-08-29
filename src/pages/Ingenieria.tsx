@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ingenieria as api, users as usersApi } from '../api/endpoints';
 import type { ProyectoIngenieria, TipoProyecto, EstadoProyecto } from '../types';
-import { Plus, Search, X, Pencil, Zap, Wrench, ChevronRight, CalendarDays, Euro, Cpu } from 'lucide-react';
+import { Plus, Search, X, Pencil, Zap, Wrench, CalendarDays, Euro, Cpu } from 'lucide-react';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const TIPO_LABELS: Record<TipoProyecto, string> = {
@@ -39,11 +39,6 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: ProyectoIn
   const { data: users = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
   const tecnicos = users.filter(u => u.activo);
 
-  const blank = {
-    nombre: '', cliente: '', tipo: 'fv' as TipoProyecto, estado: 'diseño' as EstadoProyecto,
-    descripcion: '', potencia_kwp: '', presupuesto: '', fechaEntregaEstimada: '',
-    direccion: '', provincia: '', notas: '', tecnico_id: '',
-  };
   const [form, setForm] = useState({
     nombre: editing?.nombre ?? '',
     cliente: editing?.cliente ?? '',
@@ -249,7 +244,6 @@ function ProyectoCard({ p, onEdit }: { p: ProyectoIngenieria; onEdit: (p: Proyec
 
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function Ingenieria() {
-  const qc = useQueryClient();
   const { data = [], isLoading } = useQuery({ queryKey: ['ingenieria'], queryFn: () => api.list() });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProyectoIngenieria | null>(null);
@@ -311,7 +305,7 @@ export default function Ingenieria() {
           { label: 'En ejecución', value: enEjecucion.length, color: 'text-violet-600', bg: 'bg-violet-50' },
           { label: 'Completados', value: completados.length, color: 'text-green-600', bg: 'bg-green-50' },
           { label: 'Potencia total', value: `${Math.round(potenciaTotal * 10) / 10} kWp`, color: 'text-amber-600', bg: 'bg-amber-50' },
-        ].map(({ label, value, color, bg }) => (
+        ].map(({ label, value, color }) => (
           <div key={label} className="bg-white rounded-xl border border-slate-200 p-4">
             <p className={`text-2xl font-bold ${color}`}>{value}</p>
             <p className="text-xs text-slate-500 mt-0.5">{label}</p>
