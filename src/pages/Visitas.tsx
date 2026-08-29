@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi, checklists as checklistsApi, inventario as inventarioApi } from '../api/endpoints';
 import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2, Pencil, AlertTriangle, Plane, Package } from 'lucide-react';
 import Badge from '../components/ui/Badge';
-import type { TipoVisita, EstadoVisita, Visita, InventarioArticulo, VisitaArticulo } from '../types';
+import type { TipoVisita, EstadoVisita, Visita, InventarioArticulo, VisitaArticulo, Almacen } from '../types';
 
 const TIPO_LABELS: Record<TipoVisita, string> = {
   visita_tecnica_fv: 'V.T. Fotovoltaica',
@@ -43,10 +43,13 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
   const { data: insts = [] } = useQuery({ queryKey: ['instalaciones'], queryFn: instApi.list });
   const { data: users = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
   const { data: articulosTodos = [] } = useQuery({ queryKey: ['inventario-all'], queryFn: () => inventarioApi.articulos.list() });
+  const { data: almacenes = [] } = useQuery({ queryKey: ['almacenes'], queryFn: () => inventarioApi.almacenes.list() });
   const tecnicos = users.filter(u => u.rol === 'tecnico' && u.activo);
   const paneles = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Panel Solar' && a.activo);
   const inversores = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Inversor' && a.activo);
   const baterias = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Batería' && a.activo);
+  const stockEnAlmacen = (art: InventarioArticulo, almacenId: string) =>
+    Number(art.stocks?.find(s => s.almacen_id === almacenId)?.stockActual ?? 0);
 
   const [form, setForm] = useState({
     instalacion_id: editing?.instalacion_id ?? '',
@@ -58,7 +61,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     notas: editing?.notas ?? '',
     modalidad: editing?.modalidad ?? '',
     viaja: editing?.viaja ?? false,
-    llevaAts: (editing as any)?.llevaAts ?? false,
+    llevaAts: editing?.llevaAts ?? false,
+    almacen_id: editing?.almacen_id ?? '',
     importeExtras: editing?.importeExtras != null ? String(editing.importeExtras) : '',
     plantillaId: '',
   });
@@ -95,6 +99,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     const d: any = { ...rest };
     if (!d.modalidad) delete d.modalidad;
     if (!d.viaja) delete d.viaja;
+    if (!d.almacen_id) delete d.almacen_id;
     if (d.importeExtras !== '' && d.importeExtras != null) d.importeExtras = Number(d.importeExtras);
     else delete d.importeExtras;
     return d;
@@ -286,8 +291,22 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
 
+          {/* Almacén de origen del material */}
+          {(paneles.length > 0 || inversores.length > 0 || baterias.length > 0 || editing) && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Almacén de origen (para materiales)</label>
+              <select value={form.almacen_id} onChange={set('almacen_id')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
+                <option value="">— Seleccionar —</option>
+                {(almacenes as Almacen[]).map(al => (
+                  <option key={al.id} value={al.id}>{al.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Paneles solares (solo al crear) */}
-          {!editing && paneles.length > 0 && (
+          {!editing && form.almacen_id && paneles.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Panel Solar (descuenta stock)</label>
               <div className="flex gap-2">
@@ -296,7 +315,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
                   <option value="">— Ninguno —</option>
                   {paneles.map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.nombre} (stock: {Number(a.stockActual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                      {a.nombre} (stock: {stockEnAlmacen(a, form.almacen_id).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
                     </option>
                   ))}
                 </select>
@@ -309,7 +328,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
           )}
 
           {/* Inversores (solo al crear) */}
-          {!editing && inversores.length > 0 && (
+          {!editing && form.almacen_id && inversores.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Inversor (descuenta stock)</label>
               <div className="flex gap-2">
@@ -318,7 +337,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
                   <option value="">— Ninguno —</option>
                   {inversores.map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.nombre} (stock: {Number(a.stockActual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                      {a.nombre} (stock: {stockEnAlmacen(a, form.almacen_id).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
                     </option>
                   ))}
                 </select>
@@ -331,7 +350,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
           )}
 
           {/* Baterías (solo al crear) */}
-          {!editing && baterias.length > 0 && (
+          {!editing && form.almacen_id && baterias.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Batería (descuenta stock)</label>
               <div className="flex gap-2">
@@ -340,7 +359,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
                   <option value="">— Ninguna —</option>
                   {baterias.map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.nombre} (stock: {Number(a.stockActual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                      {a.nombre} (stock: {stockEnAlmacen(a, form.almacen_id).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
                     </option>
                   ))}
                 </select>
@@ -587,7 +606,7 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
               <p className="font-medium text-slate-700 capitalize">{visita.modalidad}</p>
             </div>
           )}
-          {(visita as any).llevaAts && (
+          {visita.llevaAts && (
             <div>
               <p className="text-slate-400 mb-0.5">ATS</p>
               <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
@@ -608,14 +627,23 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
               <Package size={12} /> Materiales usados {(articulos as VisitaArticulo[]).length > 0 && `(${(articulos as VisitaArticulo[]).length})`}
+              {visita.almacen && <span className="normal-case font-normal text-slate-400">· {visita.almacen.nombre}</span>}
             </p>
-            <button onClick={() => setShowAddArticulo(v => !v)}
-              className="text-xs text-brand hover:underline flex items-center gap-1">
-              <Plus size={12} /> Añadir
-            </button>
+            {visita.almacen_id && (
+              <button onClick={() => setShowAddArticulo(v => !v)}
+                className="text-xs text-brand hover:underline flex items-center gap-1">
+                <Plus size={12} /> Añadir
+              </button>
+            )}
           </div>
 
-          {showAddArticulo && (
+          {!visita.almacen_id && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+              Esta visita no tiene almacén de origen asignado — edítala para poder añadir materiales.
+            </p>
+          )}
+
+          {showAddArticulo && visita.almacen_id && (
             <div className="bg-slate-50 rounded-lg p-3 space-y-2 border border-slate-200">
               <div className="flex gap-2">
                 <select value={selArticuloId} onChange={e => setSelArticuloId(e.target.value)}
@@ -623,7 +651,7 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
                   <option value="">— Artículo —</option>
                   {(articulosDisp as InventarioArticulo[]).map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.nombre} (stock: {Number(a.stockActual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                      {a.nombre} (stock: {Number(a.stocks?.find(s => s.almacen_id === visita.almacen_id)?.stockActual ?? 0).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
                     </option>
                   ))}
                 </select>

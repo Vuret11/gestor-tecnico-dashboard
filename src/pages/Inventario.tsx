@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventario as api } from '../api/endpoints';
-import type { InventarioArticulo } from '../types';
+import type { InventarioArticulo, Almacen } from '../types';
 import { Plus, Pencil, Trash2, Package, AlertTriangle, Search, X, TrendingUp, TrendingDown } from 'lucide-react';
 
 const UNIDADES = ['ud', 'kg', 'g', 'm', 'm²', 'm³', 'l', 'ml', 'caja', 'rollo', 'par'];
@@ -11,12 +11,16 @@ function formatEur(n?: number | null) {
   return `${Number(n).toFixed(2)} €`;
 }
 
+function stockDe(art: InventarioArticulo, almacenId: string) {
+  return art.stocks?.find(s => s.almacen_id === almacenId);
+}
+
 function StockBadge({ actual, minimo, unidad }: { actual: number; minimo: number; unidad: string }) {
   const bajo = Number(actual) <= Number(minimo);
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
       bajo ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-    }`}>
+    }`} title={`Mínimo: ${Number(minimo).toLocaleString('es-ES', { maximumFractionDigits: 3 })} ${unidad}`}>
       {bajo ? <AlertTriangle size={10} /> : null}
       {Number(actual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {unidad}
     </span>
@@ -30,8 +34,6 @@ function ArticuloModal({ item, onClose }: { item?: InventarioArticulo; onClose: 
     nombre: item?.nombre ?? '',
     descripcion: item?.descripcion ?? '',
     unidad: item?.unidad ?? 'ud',
-    stockActual: item ? String(item.stockActual) : '0',
-    stockMinimo: item ? String(item.stockMinimo) : '0',
     precioUnitario: item?.precioUnitario != null ? String(item.precioUnitario) : '',
     categoria: item?.categoria ?? '',
   });
@@ -46,8 +48,6 @@ function ArticuloModal({ item, onClose }: { item?: InventarioArticulo; onClose: 
         nombre: form.nombre,
         descripcion: form.descripcion || undefined,
         unidad: form.unidad,
-        stockActual: Number(form.stockActual),
-        stockMinimo: Number(form.stockMinimo),
         precioUnitario: form.precioUnitario ? Number(form.precioUnitario) : undefined,
         categoria: form.categoria || undefined,
       };
@@ -96,17 +96,12 @@ function ArticuloModal({ item, onClose }: { item?: InventarioArticulo; onClose: 
             <input type="number" min="0" step="0.01" value={form.precioUnitario} onChange={set('precioUnitario')} placeholder="—"
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Stock actual</label>
-            <input type="number" min="0" step="0.001" value={form.stockActual} onChange={set('stockActual')}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Stock mínimo</label>
-            <input type="number" min="0" step="0.001" value={form.stockMinimo} onChange={set('stockMinimo')}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
-          </div>
         </div>
+        {!item && (
+          <p className="mx-6 mb-3 text-xs text-slate-400">
+            El artículo se crea con stock 0 en todos los almacenes. Ajusta el stock por almacén después de guardar.
+          </p>
+        )}
         {save.isError && (
           <div className="mx-6 mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
             {(save.error as any)?.response?.data?.message ?? 'Error al guardar'}
@@ -127,71 +122,100 @@ function ArticuloModal({ item, onClose }: { item?: InventarioArticulo; onClose: 
   );
 }
 
-function AjusteStockModal({ item, onClose }: { item: InventarioArticulo; onClose: () => void }) {
+function AjusteStockModal({ item, almacenes, onClose }: { item: InventarioArticulo; almacenes: Almacen[]; onClose: () => void }) {
   const qc = useQueryClient();
-  const [cantidad, setCantidad] = useState('');
-  const [modo, setModo] = useState<'entrada' | 'salida'>('entrada');
+  const [cantidades, setCantidades] = useState<Record<string, string>>({});
+  const [modos, setModos] = useState<Record<string, 'entrada' | 'salida'>>({});
+  const [minimos, setMinimos] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const al of almacenes) {
+      init[al.id] = String(stockDe(item, al.id)?.stockMinimo ?? 0);
+    }
+    return init;
+  });
 
   const ajustar = useMutation({
-    mutationFn: () => {
-      const n = Number(cantidad);
-      return api.articulos.ajustarStock(item.id, modo === 'entrada' ? n : -n);
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventario'] }); onClose(); },
+    mutationFn: ({ almacenId, delta, stockMinimo }: { almacenId: string; delta?: number; stockMinimo?: number }) =>
+      api.articulos.ajustarStock(item.id, almacenId, delta, stockMinimo),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventario'] }),
   });
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl">
         <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center">
-          <h2 className="font-semibold text-slate-900">Ajustar stock</h2>
+          <h2 className="font-semibold text-slate-900">Stock por almacén — {item.nombre}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
         </div>
-        <div className="p-5 space-y-4">
-          <p className="text-sm text-slate-600">
-            <span className="font-medium">{item.nombre}</span> — Stock actual:{' '}
-            <span className="font-semibold">{Number(item.stockActual).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {item.unidad}</span>
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setModo('entrada')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                modo === 'entrada' ? 'bg-green-50 border-green-400 text-green-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              <TrendingUp size={14} /> Entrada
-            </button>
-            <button
-              onClick={() => setModo('salida')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                modo === 'salida' ? 'bg-red-50 border-red-400 text-red-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              <TrendingDown size={14} /> Salida
-            </button>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Cantidad ({item.unidad})</label>
-            <input
-              type="number" min="0.001" step="0.001"
-              value={cantidad} onChange={e => setCantidad(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-              placeholder="0"
-            />
-          </div>
+        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          {almacenes.map(al => {
+            const stock = stockDe(item, al.id);
+            const actual = Number(stock?.stockActual ?? 0);
+            const cantidad = cantidades[al.id] ?? '';
+            const modo = modos[al.id] ?? 'entrada';
+            return (
+              <div key={al.id} className="border border-slate-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-slate-800 text-sm">{al.nombre}</span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {actual.toLocaleString('es-ES', { maximumFractionDigits: 3 })} {item.unidad}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setModos(m => ({ ...m, [al.id]: 'entrada' }))}
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium border ${
+                      modo === 'entrada' ? 'bg-green-50 border-green-400 text-green-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <TrendingUp size={12} /> Entrada
+                  </button>
+                  <button
+                    onClick={() => setModos(m => ({ ...m, [al.id]: 'salida' }))}
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium border ${
+                      modo === 'salida' ? 'bg-red-50 border-red-400 text-red-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <TrendingDown size={12} /> Salida
+                  </button>
+                  <input
+                    type="number" min="0.001" step="0.001" value={cantidad}
+                    onChange={e => setCantidades(c => ({ ...c, [al.id]: e.target.value }))}
+                    placeholder="Cantidad"
+                    className="flex-1 border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                  <button
+                    onClick={() => {
+                      const n = Number(cantidad);
+                      if (!n || n <= 0) return;
+                      ajustar.mutate({ almacenId: al.id, delta: modo === 'entrada' ? n : -n });
+                      setCantidades(c => ({ ...c, [al.id]: '' }));
+                    }}
+                    disabled={ajustar.isPending || !cantidad || Number(cantidad) <= 0}
+                    className="px-3 py-1.5 text-xs bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <span>Mínimo:</span>
+                  <input
+                    type="number" min="0" step="0.001" value={minimos[al.id] ?? '0'}
+                    onChange={e => setMinimos(m => ({ ...m, [al.id]: e.target.value }))}
+                    onBlur={() => ajustar.mutate({ almacenId: al.id, stockMinimo: Number(minimos[al.id] || 0) })}
+                    className="w-24 border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand"
+                  />
+                  <span>{item.unidad}</span>
+                </div>
+              </div>
+            );
+          })}
           {ajustar.isError && (
             <p className="text-xs text-red-600">{(ajustar.error as any)?.response?.data?.message ?? 'Error'}</p>
           )}
         </div>
-        <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600">Cancelar</button>
-          <button
-            onClick={() => ajustar.mutate()}
-            disabled={ajustar.isPending || !cantidad || Number(cantidad) <= 0}
-            className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50"
-          >
-            {ajustar.isPending ? 'Guardando...' : 'Aplicar'}
-          </button>
+        <div className="px-5 py-4 border-t border-slate-200 flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark">Cerrar</button>
         </div>
       </div>
     </div>
@@ -201,6 +225,7 @@ function AjusteStockModal({ item, onClose }: { item: InventarioArticulo; onClose
 export default function Inventario() {
   const qc = useQueryClient();
   const { data = [], isLoading } = useQuery({ queryKey: ['inventario'], queryFn: () => api.articulos.list() });
+  const { data: almacenes = [] } = useQuery({ queryKey: ['almacenes'], queryFn: () => api.almacenes.list() });
   const [modal, setModal] = useState<{ open: boolean; item?: InventarioArticulo }>({ open: false });
   const [ajusteModal, setAjusteModal] = useState<InventarioArticulo | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -213,11 +238,14 @@ export default function Inventario() {
     return [...set].sort() as string[];
   }, [data]);
 
+  const stockBajoArticulo = (a: InventarioArticulo) =>
+    (a.stocks ?? []).some(s => Number(s.stockActual) <= Number(s.stockMinimo));
+
   const filtrados = useMemo(() => {
     const q = busqueda.toLowerCase();
     return (data as InventarioArticulo[]).filter(a => {
       if (filtroCategoria && a.categoria !== filtroCategoria) return false;
-      if (soloStockBajo && Number(a.stockActual) > Number(a.stockMinimo)) return false;
+      if (soloStockBajo && !stockBajoArticulo(a)) return false;
       if (q && !(
         a.nombre.toLowerCase().includes(q) ||
         (a.referencia ?? '').toLowerCase().includes(q) ||
@@ -227,7 +255,7 @@ export default function Inventario() {
     });
   }, [data, busqueda, filtroCategoria, soloStockBajo]);
 
-  const stockBajoCount = (data as InventarioArticulo[]).filter(a => Number(a.stockActual) <= Number(a.stockMinimo)).length;
+  const stockBajoCount = (data as InventarioArticulo[]).filter(stockBajoArticulo).length;
 
   const eliminar = useMutation({
     mutationFn: (id: string) => api.articulos.remove(id),
@@ -285,23 +313,23 @@ export default function Inventario() {
       {isLoading
         ? <p className="text-sm text-slate-400">Cargando...</p>
         : (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  {['Referencia', 'Artículo', 'Categoría', 'Unidad', 'Stock', 'Mínimo', 'Precio', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{h}</th>
+                  {['Referencia', 'Artículo', 'Categoría', 'Unidad', ...almacenes.map((a: Almacen) => a.nombre), 'Precio', ''].map((h, i) => (
+                    <th key={`${h}-${i}`} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtrados.length === 0 && (
-                  <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">
+                  <tr><td colSpan={5 + almacenes.length} className="px-4 py-10 text-center text-slate-400 text-sm">
                     {busqueda || filtroCategoria || soloStockBajo ? 'Sin resultados' : 'Sin artículos. Crea el primero.'}
                   </td></tr>
                 )}
                 {filtrados.map(art => (
-                  <tr key={art.id} className={`hover:bg-slate-50 ${Number(art.stockActual) <= Number(art.stockMinimo) ? 'bg-red-50/30' : ''}`}>
+                  <tr key={art.id} className={`hover:bg-slate-50 ${stockBajoArticulo(art) ? 'bg-red-50/30' : ''}`}>
                     <td className="px-4 py-3 text-slate-500 font-mono text-xs">{art.referencia || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{art.nombre}</div>
@@ -313,12 +341,14 @@ export default function Inventario() {
                         : <span className="text-slate-400">—</span>}
                     </td>
                     <td className="px-4 py-3 text-slate-600">{art.unidad}</td>
-                    <td className="px-4 py-3">
-                      <StockBadge actual={art.stockActual} minimo={art.stockMinimo} unidad={art.unidad} />
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">
-                      {Number(art.stockMinimo).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {art.unidad}
-                    </td>
+                    {almacenes.map((al: Almacen) => {
+                      const s = stockDe(art, al.id);
+                      return (
+                        <td key={al.id} className="px-4 py-3">
+                          <StockBadge actual={s?.stockActual ?? 0} minimo={s?.stockMinimo ?? 0} unidad={art.unidad} />
+                        </td>
+                      );
+                    })}
                     <td className="px-4 py-3 text-slate-600">{formatEur(art.precioUnitario)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -350,7 +380,7 @@ export default function Inventario() {
         )}
 
       {modal.open && <ArticuloModal item={modal.item} onClose={() => setModal({ open: false })} />}
-      {ajusteModal && <AjusteStockModal item={ajusteModal} onClose={() => setAjusteModal(null)} />}
+      {ajusteModal && <AjusteStockModal item={ajusteModal} almacenes={almacenes} onClose={() => setAjusteModal(null)} />}
     </div>
   );
 }

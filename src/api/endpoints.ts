@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo, InventarioArticulo, VisitaArticulo, ProyectoIngenieria } from '../types';
+import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo, InventarioArticulo, VisitaArticulo, Almacen, ProyectoIngenieria } from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -142,6 +142,10 @@ export const planificacion = {
 };
 
 export const inventario = {
+  almacenes: {
+    list: () => api.get<Almacen[]>('/inventario/almacenes').then(r => r.data),
+    create: (nombre: string) => api.post<Almacen>('/inventario/almacenes', { nombre }).then(r => r.data),
+  },
   articulos: {
     list: (todos?: boolean) =>
       api.get<InventarioArticulo[]>('/inventario/articulos', { params: todos ? { todos: 'true' } : {} }).then(r => r.data),
@@ -149,8 +153,8 @@ export const inventario = {
       api.post<InventarioArticulo>('/inventario/articulos', data).then(r => r.data),
     update: (id: string, data: Partial<InventarioArticulo>) =>
       api.patch<InventarioArticulo>(`/inventario/articulos/${id}`, data).then(r => r.data),
-    ajustarStock: (id: string, cantidad: number) =>
-      api.patch<InventarioArticulo>(`/inventario/articulos/${id}/stock`, { cantidad }).then(r => r.data),
+    ajustarStock: (id: string, almacenId: string, delta?: number, stockMinimo?: number) =>
+      api.patch<InventarioArticulo>(`/inventario/articulos/${id}/almacenes/${almacenId}`, { delta, stockMinimo }).then(r => r.data),
     remove: (id: string) => api.delete(`/inventario/articulos/${id}`),
   },
   visita: {

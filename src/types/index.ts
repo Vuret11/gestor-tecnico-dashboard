@@ -86,6 +86,9 @@ export interface Visita {
   notas?: string;
   modalidad?: 'nueva' | 'reforma';
   viaja?: boolean;
+  llevaAts?: boolean;
+  almacen_id?: string;
+  almacen?: Almacen;
   importeExtras?: number;
   createdAt: string;
   updatedAt: string;
@@ -267,14 +270,29 @@ export interface PlanAsignacion {
 }
 
 // ── Inventario ────────────────────────────────────────────────────────────────
+export interface Almacen {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  createdAt: string;
+}
+
+export interface InventarioStock {
+  id: string;
+  articulo_id: string;
+  almacen_id: string;
+  almacen: Almacen;
+  stockActual: number;
+  stockMinimo: number;
+}
+
 export interface InventarioArticulo {
   id: string;
   referencia?: string;
   nombre: string;
   descripcion?: string;
   unidad: string;
-  stockActual: number;
-  stockMinimo: number;
+  stocks: InventarioStock[];
   precioUnitario?: number;
   categoria?: string;
   activo: boolean;
@@ -286,6 +304,8 @@ export interface VisitaArticulo {
   visita_id: string;
   articulo_id: string;
   articulo: InventarioArticulo;
+  almacen_id?: string;
+  almacen?: Almacen;
   cantidad: number;
   precioUnitario?: number;
   notas?: string;
