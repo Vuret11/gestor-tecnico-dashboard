@@ -55,7 +55,7 @@ export default function PlanImportar() {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const wb = XLSX.read(e.target!.result, { type: 'binary' });
+        const wb = XLSX.read(e.target!.result, { type: 'array' });
         const ws = wb.Sheets['Planificacion'];
         if (!ws) { setError('No se encontró la hoja "Planificacion"'); return; }
 
@@ -126,7 +126,7 @@ export default function PlanImportar() {
         setError('Error al procesar el archivo: ' + err.message);
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   }
 
   const tecnicosNombres = new Set(tecnicos.map(t => t.nombre));
