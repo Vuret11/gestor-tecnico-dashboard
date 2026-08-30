@@ -1,12 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instalaciones as api, clientes as clientesApi } from '../api/endpoints';
 import type { Instalacion, Cliente } from '../types';
-import { Plus, Pencil, MapPin, Trash2, Search, X } from 'lucide-react';
+import { Plus, Pencil, MapPin, Trash2, Search, X, FileText, Upload } from 'lucide-react';
 
 function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
   const qc = useQueryClient();
   const { data: partners = [] } = useQuery({ queryKey: ['clientes'], queryFn: clientesApi.list });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [subiendoArchivo, setSubiendoArchivo] = useState(false);
+  const [archivoError, setArchivoError] = useState('');
 
   const [form, setForm] = useState({
     nombre: item?.nombre ?? '',
@@ -28,7 +32,22 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
       const data = raw as Partial<Instalacion>;
       return item ? api.update(item.id, data) : api.create(data);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['instalaciones'] }); onClose(); },
+    onSuccess: async (saved) => {
+      if (archivo) {
+        setSubiendoArchivo(true);
+        try {
+          await api.uploadMemoriaTecnica(saved.id, archivo);
+        } catch {
+          setArchivoError('La instalación se guardó, pero la memoria técnica no se pudo subir.');
+          setSubiendoArchivo(false);
+          qc.invalidateQueries({ queryKey: ['instalaciones'] });
+          return;
+        }
+        setSubiendoArchivo(false);
+      }
+      qc.invalidateQueries({ queryKey: ['instalaciones'] });
+      onClose();
+    },
   });
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -114,6 +133,27 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
             <textarea value={form.notas} onChange={set('notas')} rows={2}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none" />
           </div>
+
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Memoria técnica {item?.memoriaTecnicaNombre && !archivo && <span className="text-slate-400 font-normal">(el técnico la ve como "Anotaciones" en la app)</span>}
+            </label>
+            <input ref={fileInputRef} type="file" className="hidden"
+              onChange={e => setArchivo(e.target.files?.[0] ?? null)} />
+            {item?.memoriaTecnicaNombre && !archivo && (
+              <a href={item.memoriaTecnicaUrl} target="_blank" rel="noreferrer"
+                className="flex items-center gap-2 mb-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-100">
+                <FileText size={14} className="text-brand flex-shrink-0" />
+                <span className="truncate flex-1">{item.memoriaTecnicaNombre}</span>
+              </a>
+            )}
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-500 hover:border-brand hover:text-brand">
+              <Upload size={14} />
+              {archivo ? archivo.name : item?.memoriaTecnicaNombre ? 'Sustituir archivo' : 'Adjuntar archivo (PDF)'}
+            </button>
+            {archivoError && <p className="text-xs text-red-600 mt-1">{archivoError}</p>}
+          </div>
         </div>
         {save.isError && (
           <div className="mx-6 mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-medium">
@@ -124,10 +164,10 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">Cancelar</button>
           <button
             onClick={() => save.mutate()}
-            disabled={save.isPending || !form.nombre.trim() || (!item && (!form.direccion.trim() || !form.ciudad.trim()))}
+            disabled={save.isPending || subiendoArchivo || !form.nombre.trim() || (!item && (!form.direccion.trim() || !form.ciudad.trim()))}
             className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50"
           >
-            {save.isPending ? 'Guardando...' : 'Guardar'}
+            {subiendoArchivo ? 'Subiendo archivo...' : save.isPending ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
       </div>

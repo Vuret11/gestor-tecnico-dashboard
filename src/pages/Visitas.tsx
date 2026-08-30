@@ -100,6 +100,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     if (!d.modalidad) delete d.modalidad;
     if (!d.viaja) delete d.viaja;
     if (!d.almacen_id) delete d.almacen_id;
+    if (!d.tecnico_id) delete d.tecnico_id;
     if (d.importeExtras !== '' && d.importeExtras != null) d.importeExtras = Number(d.importeExtras);
     else delete d.importeExtras;
     return d;
@@ -257,10 +258,10 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
 
           {/* Técnico */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Técnico</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Técnico (opcional)</label>
             <select value={form.tecnico_id} onChange={set('tecnico_id')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
-              <option value="">Seleccionar...</option>
+              <option value="">Sin asignar</option>
               {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
             </select>
           </div>
@@ -450,7 +451,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600">Cancelar</button>
           <button onClick={() => save.mutate()}
-            disabled={busy || !form.instalacion_id || !form.tecnico_id || !form.fechaProgramada}
+            disabled={busy || !form.instalacion_id || !form.fechaProgramada}
             className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50">
             {uploading ? `Subiendo ${adjuntos.length} archivo${adjuntos.length > 1 ? 's' : ''}...` : save.isPending ? 'Guardando...' : editing ? 'Guardar cambios' : 'Programar'}
           </button>

@@ -48,6 +48,13 @@ export const instalaciones = {
   update: (id: string, data: Partial<Instalacion>) =>
     api.patch<Instalacion>(`/instalaciones/${id}`, data).then(r => r.data),
   remove: (id: string) => api.delete(`/instalaciones/${id}`),
+  uploadMemoriaTecnica: (id: string, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post<Instalacion>(`/instalaciones/${id}/memoria-tecnica`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
 };
 
 export const visitas = {

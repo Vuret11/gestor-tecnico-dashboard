@@ -387,6 +387,7 @@ export default function PlanSemanal() {
   const mapaVisitas = useMemo(() => {
     const m = new Map<string, Map<string, Visita[]>>();
     visitasSemana.forEach(v => {
+      if (!v.tecnico_id) return;
       const ptId = userIdToPlanTecnico.get(v.tecnico_id);
       if (!ptId) return;
       const d = new Date(v.fechaProgramada);

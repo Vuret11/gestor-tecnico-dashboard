@@ -66,6 +66,8 @@ export interface Instalacion {
   latitud?: number;
   longitud?: number;
   notas?: string;
+  memoriaTecnicaUrl?: string;
+  memoriaTecnicaNombre?: string;
   tipoInstalacion?: TipoInstalacion | null;
   importe?: number;
   activo: boolean;
@@ -76,8 +78,8 @@ export interface Visita {
   id: string;
   instalacion: Instalacion;
   instalacion_id: string;
-  tecnico: User;
-  tecnico_id: string;
+  tecnico?: User;
+  tecnico_id?: string;
   fechaProgramada: string;
   fechaInicio?: string;
   fechaFin?: string;
