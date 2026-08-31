@@ -284,8 +284,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
 
-          {/* Almacén de origen del material — solo una vez creada la visita */}
-          {editing && (
+          {/* Almacén de origen del material — solo una vez creada la visita, y solo en Instalación nueva FV */}
+          {editing && form.tipo === 'instalacion_nueva_fv' && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Almacén de origen (para materiales)</label>
               <select value={form.almacen_id} onChange={set('almacen_id')}
@@ -299,7 +299,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
           )}
 
           {/* Paneles solares — solo una vez creada la visita */}
-          {editing && form.almacen_id && paneles.length > 0 && (
+          {editing && form.tipo === 'instalacion_nueva_fv' && form.almacen_id && paneles.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Panel Solar (descuenta stock)</label>
               <div className="flex gap-2">
@@ -321,7 +321,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
           )}
 
           {/* Inversores — solo una vez creada la visita */}
-          {editing && form.almacen_id && inversores.length > 0 && (
+          {editing && form.tipo === 'instalacion_nueva_fv' && form.almacen_id && inversores.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Inversor (descuenta stock)</label>
               <div className="flex gap-2">
@@ -343,7 +343,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
           )}
 
           {/* Baterías — solo una vez creada la visita */}
-          {editing && form.almacen_id && baterias.length > 0 && (
+          {editing && form.tipo === 'instalacion_nueva_fv' && form.almacen_id && baterias.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Batería (descuenta stock)</label>
               <div className="flex gap-2">
@@ -577,7 +577,8 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
           )}
         </div>
 
-        {/* Inventario materiales */}
+        {/* Inventario materiales — solo en Instalación nueva FV */}
+        {visita.tipo === 'instalacion_nueva_fv' && (
         <div className="px-5 py-3 border-b border-slate-100 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
@@ -658,6 +659,7 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
             </div>
           )}
         </div>
+        )}
 
         {/* Documentación */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
