@@ -1,12 +1,17 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { instalaciones as api, clientes as clientesApi } from '../api/endpoints';
-import type { Instalacion, Cliente } from '../types';
-import { Plus, Pencil, MapPin, Trash2, Search, X, FileText, Upload } from 'lucide-react';
+import { instalaciones as api, clientes as clientesApi, inventario as inventarioApi } from '../api/endpoints';
+import type { Instalacion, Cliente, VisitaArticulo } from '../types';
+import { Plus, Pencil, MapPin, Trash2, Search, X, FileText, Upload, Package } from 'lucide-react';
 
 function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
   const qc = useQueryClient();
   const { data: partners = [] } = useQuery({ queryKey: ['clientes'], queryFn: clientesApi.list });
+  const { data: materiales = [] } = useQuery({
+    queryKey: ['instalacion-articulos', item?.id],
+    queryFn: () => inventarioApi.instalacion.list(item!.id),
+    enabled: !!item,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
@@ -64,12 +69,12 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
           <h2 className="font-semibold text-slate-900">{item ? 'Editar instalación' : 'Nueva instalación'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
-        <div className="p-6 grid grid-cols-2 gap-4">
+        <div className="p-6 grid grid-cols-2 gap-4 overflow-y-auto flex-1">
           <div className="col-span-2">
             <label className="block text-xs font-medium text-slate-600 mb-1">Nombre</label>
             <input value={form.nombre} onChange={set('nombre')}
@@ -154,13 +159,53 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
             </button>
             {archivoError && <p className="text-xs text-red-600 mt-1">{archivoError}</p>}
           </div>
+
+          {item && (
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-2 flex items-center gap-1.5">
+                <Package size={13} /> Material instalado
+                {materiales.length > 0 && <span className="text-slate-400 font-normal">({materiales.length})</span>}
+              </label>
+              {materiales.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  Sin material registrado en las visitas de esta instalación.
+                </p>
+              ) : (
+                <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+                  {(materiales as VisitaArticulo[]).map(va => (
+                    <div key={va.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                      <div>
+                        <span className="font-medium text-slate-800">{va.articulo?.nombre}</span>
+                        <span className="text-slate-400 ml-1.5">
+                          × {Number(va.cantidad).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {va.articulo?.unidad}
+                        </span>
+                        {va.almacen?.nombre && <span className="text-slate-400 ml-1.5">· {va.almacen.nombre}</span>}
+                      </div>
+                      {va.precioUnitario != null && (
+                        <span className="text-slate-500">
+                          {(Number(va.precioUnitario) * Number(va.cantidad)).toFixed(2)} €
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                  {materiales.some(va => va.precioUnitario != null) && (
+                    <div className="px-3 py-2 text-xs text-right font-medium text-slate-600">
+                      Total: {materiales.reduce((s, va) =>
+                        s + (va.precioUnitario != null ? Number(va.precioUnitario) * Number(va.cantidad) : 0), 0
+                      ).toFixed(2)} €
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {save.isError && (
-          <div className="mx-6 mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-medium">
+          <div className="mx-6 mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-medium flex-shrink-0">
             Error: {(save.error as any)?.response?.data?.message ?? (save.error as any)?.message ?? 'No se pudo guardar. Revisa los campos.'}
           </div>
         )}
-        <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">Cancelar</button>
           <button
             onClick={() => save.mutate()}

@@ -172,6 +172,10 @@ export const inventario = {
       api.post<VisitaArticulo>(`/inventario/visita/${visitaId}`, data).then(r => r.data),
     remove: (lineaId: string) => api.delete(`/inventario/visita/linea/${lineaId}`),
   },
+  instalacion: {
+    list: (instalacionId: string) =>
+      api.get<VisitaArticulo[]>(`/inventario/instalacion/${instalacionId}`).then(r => r.data),
+  },
   historial: (desde?: string, hasta?: string) =>
     api.get<VisitaArticulo[]>('/inventario/historial', { params: { desde, hasta } }).then(r => r.data),
 };
