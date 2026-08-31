@@ -13,7 +13,7 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
     enabled: !!item,
   });
   const { data: todasVisitas = [] } = useQuery({ queryKey: ['visitas'], queryFn: visitasApi.list, enabled: !!item });
-  const atsCount = item ? todasVisitas.filter(v => v.instalacion_id === item.id && v.llevaAts).length : 0;
+  const atsCount = item ? todasVisitas.filter(v => v.instalacion_id === item.id && v.llevaAts && v.tipo === 'instalacion_nueva_fv').length : 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);

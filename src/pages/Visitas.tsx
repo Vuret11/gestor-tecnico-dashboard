@@ -364,8 +364,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
             </div>
           )}
 
-          {/* ATS — solo una vez creada la visita */}
-          {editing && (
+          {/* ATS — solo una vez creada la visita, y solo en Instalación nueva FV */}
+          {editing && form.tipo === 'instalacion_nueva_fv' && (
             <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
               <input
                 type="checkbox"
