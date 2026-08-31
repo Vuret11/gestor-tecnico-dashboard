@@ -106,6 +106,7 @@ export interface Foto {
   latitud?: number;
   longitud?: number;
   descripcion?: string;
+  visibleTecnico?: boolean;
   createdAt: string;
 }
 

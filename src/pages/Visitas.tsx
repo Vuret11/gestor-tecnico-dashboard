@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { visitas as api, instalaciones as instApi, users as usersApi, fotos as fotosApi, checklists as checklistsApi, inventario as inventarioApi } from '../api/endpoints';
-import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, ImageIcon, Trash2, Pencil, AlertTriangle, Plane, Package } from 'lucide-react';
+import { Plus, Wrench, Zap, Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Paperclip, FileText, Trash2, Pencil, AlertTriangle, Plane, Package } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import type { TipoVisita, EstadoVisita, Visita, InventarioArticulo, VisitaArticulo, Almacen } from '../types';
 
@@ -42,14 +42,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
   const qc = useQueryClient();
   const { data: insts = [] } = useQuery({ queryKey: ['instalaciones'], queryFn: instApi.list });
   const { data: users = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
-  const { data: articulosTodos = [] } = useQuery({ queryKey: ['inventario-all'], queryFn: () => inventarioApi.articulos.list() });
   const { data: almacenes = [] } = useQuery({ queryKey: ['almacenes'], queryFn: () => inventarioApi.almacenes.list() });
   const tecnicos = users.filter(u => u.rol === 'tecnico' && u.activo);
-  const paneles = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Panel Solar' && a.activo);
-  const inversores = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Inversor' && a.activo);
-  const baterias = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Batería' && a.activo);
-  const stockEnAlmacen = (art: InventarioArticulo, almacenId: string) =>
-    Number(art.stocks?.find(s => s.almacen_id === almacenId)?.stockActual ?? 0);
 
   const [form, setForm] = useState({
     instalacion_id: editing?.instalacion_id ?? '',
@@ -67,32 +61,12 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     plantillaId: '',
   });
   const [busqInst, setBusqInst] = useState('');
-  const [panelId, setPanelId] = useState('');
-  const [panelCant, setPanelCant] = useState('1');
-  const [inversorId, setInversorId] = useState('');
-  const [inversorCant, setInversorCant] = useState('1');
-  const [bateriaId, setBateriaId] = useState('');
-  const [bateriaCant, setBateriaCant] = useState('1');
-  const [adjuntos, setAdjuntos] = useState<File[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
   const [saveError, setSaveError] = useState('');
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const instsFiltradas = insts.filter(i =>
     i.nombre.toLowerCase().includes(busqInst.toLowerCase()) ||
     i.cliente.toLowerCase().includes(busqInst.toLowerCase())
   );
-
-  const addFiles = (files: FileList | null) => {
-    if (!files) return;
-    setAdjuntos(prev => [
-      ...prev,
-      ...Array.from(files).filter(f =>
-        !prev.some(p => p.name === f.name && p.size === f.size)
-      ),
-    ]);
-  };
 
   const formData = () => {
     const { plantillaId: _, ...rest } = form;
@@ -118,29 +92,6 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
       if (!editing && form.plantillaId) {
         try { await checklistsApi.asignar(visita.id, form.plantillaId); } catch { /* non-fatal */ }
       }
-      if (!editing) {
-        const stockOps = [];
-        if (panelId && Number(panelCant) > 0)
-          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: panelId, cantidad: Number(panelCant) }));
-        if (inversorId && Number(inversorCant) > 0)
-          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: inversorId, cantidad: Number(inversorCant) }));
-        if (bateriaId && Number(bateriaCant) > 0)
-          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: bateriaId, cantidad: Number(bateriaCant) }));
-        if (stockOps.length > 0) await Promise.allSettled(stockOps);
-      }
-      if (!editing && adjuntos.length > 0) {
-        setUploading(true);
-        try {
-          await Promise.all(adjuntos.map(f => fotosApi.upload(visita.id, f)));
-        } catch {
-          setUploadError('Visita guardada, pero algún adjunto no se subió correctamente.');
-          setUploading(false);
-          qc.invalidateQueries({ queryKey: ['visitas'] });
-          qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
-          return;
-        }
-        setUploading(false);
-      }
       qc.invalidateQueries({ queryKey: ['visitas'] });
       qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
       onClose();
@@ -158,7 +109,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     queryFn: () => tipoInst ? checklistsApi.plantillasByTipo(tipoInst) : checklistsApi.plantillas(),
   });
 
-  const busy = save.isPending || uploading;
+  const busy = save.isPending;
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -292,8 +243,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
 
-          {/* Almacén de origen del material */}
-          {(paneles.length > 0 || inversores.length > 0 || baterias.length > 0 || editing) && (
+          {/* Almacén de origen del material — solo una vez creada la visita */}
+          {editing && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Almacén de origen (para materiales)</label>
               <select value={form.almacen_id} onChange={set('almacen_id')}
@@ -306,142 +257,29 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
             </div>
           )}
 
-          {/* Paneles solares (solo al crear) */}
-          {!editing && form.almacen_id && paneles.length > 0 && (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Panel Solar (descuenta stock)</label>
-              <div className="flex gap-2">
-                <select value={panelId} onChange={e => setPanelId(e.target.value)}
-                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
-                  <option value="">— Ninguno —</option>
-                  {paneles.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.nombre} (stock: {stockEnAlmacen(a, form.almacen_id).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
-                    </option>
-                  ))}
-                </select>
-                {panelId && (
-                  <input type="number" min="1" step="1" value={panelCant} onChange={e => setPanelCant(e.target.value)}
-                    placeholder="Cant." className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Inversores (solo al crear) */}
-          {!editing && form.almacen_id && inversores.length > 0 && (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Inversor (descuenta stock)</label>
-              <div className="flex gap-2">
-                <select value={inversorId} onChange={e => setInversorId(e.target.value)}
-                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
-                  <option value="">— Ninguno —</option>
-                  {inversores.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.nombre} (stock: {stockEnAlmacen(a, form.almacen_id).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
-                    </option>
-                  ))}
-                </select>
-                {inversorId && (
-                  <input type="number" min="1" step="1" value={inversorCant} onChange={e => setInversorCant(e.target.value)}
-                    placeholder="Cant." className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Baterías (solo al crear) */}
-          {!editing && form.almacen_id && baterias.length > 0 && (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Batería (descuenta stock)</label>
-              <div className="flex gap-2">
-                <select value={bateriaId} onChange={e => setBateriaId(e.target.value)}
-                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
-                  <option value="">— Ninguna —</option>
-                  {baterias.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.nombre} (stock: {stockEnAlmacen(a, form.almacen_id).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
-                    </option>
-                  ))}
-                </select>
-                {bateriaId && (
-                  <input type="number" min="1" step="1" value={bateriaCant} onChange={e => setBateriaCant(e.target.value)}
-                    placeholder="Cant." className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ATS */}
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={form.llevaAts}
-              onChange={e => setForm(f => ({ ...f, llevaAts: e.target.checked }))}
-              className="rounded border-slate-300 text-amber-500"
-            />
-            <span className="font-semibold text-amber-600 text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200">ATS</span>
-            <span className="text-slate-600">Lleva ATS (Automatic Transfer Switch)</span>
-          </label>
-
-          {/* Notas */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Notas</label>
-            <textarea value={form.notas} onChange={set('notas')} rows={2}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
-          </div>
-
-          {/* Adjuntos */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Documentación adjunta <span className="font-normal text-slate-400">(fotos, PDFs)</span>
-            </label>
-            <div
-              className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-brand/40 hover:bg-slate-50 transition-colors"
-              onClick={() => fileRef.current?.click()}
-              onDragOver={e => e.preventDefault()}
-              onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
-            >
-              <Paperclip size={18} className="mx-auto text-slate-300 mb-1" />
-              <p className="text-xs text-slate-400">Arrastra aquí o <span className="text-brand">selecciona archivos</span></p>
-              <p className="text-[10px] text-slate-300 mt-0.5">Imágenes y PDFs</p>
+          {/* ATS — solo una vez creada la visita */}
+          {editing && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
               <input
-                ref={fileRef}
-                type="file"
-                multiple
-                accept="image/*,.pdf,application/pdf"
-                className="hidden"
-                onChange={e => addFiles(e.target.files)}
+                type="checkbox"
+                checked={form.llevaAts}
+                onChange={e => setForm(f => ({ ...f, llevaAts: e.target.checked }))}
+                className="rounded border-slate-300 text-amber-500"
               />
+              <span className="font-semibold text-amber-600 text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200">ATS</span>
+              <span className="text-slate-600">Lleva ATS (Automatic Transfer Switch)</span>
+            </label>
+          )}
+
+          {/* Notas — solo una vez creada la visita */}
+          {editing && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Notas</label>
+              <textarea value={form.notas} onChange={set('notas')} rows={2}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
             </div>
-
-            {adjuntos.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {adjuntos.map((f, i) => (
-                  <li key={i} className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded-lg text-xs">
-                    {f.type.startsWith('image/') ? (
-                      <ImageIcon size={13} className="text-brand flex-shrink-0" />
-                    ) : (
-                      <FileText size={13} className="text-red-500 flex-shrink-0" />
-                    )}
-                    <span className="truncate flex-1 text-slate-700">{f.name}</span>
-                    <span className="text-slate-400 flex-shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
-                    <button onClick={() => setAdjuntos(a => a.filter((_, j) => j !== i))}
-                      className="text-slate-300 hover:text-red-500 flex-shrink-0">
-                      <Trash2 size={12} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          )}
         </div>
-
-        {uploadError && (
-          <div className="mx-6 mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-            {uploadError}
-          </div>
-        )}
 
         {saveError && (
           <div className="mx-6 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
@@ -453,7 +291,7 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
           <button onClick={() => save.mutate()}
             disabled={busy || !form.instalacion_id || !form.fechaProgramada}
             className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50">
-            {uploading ? `Subiendo ${adjuntos.length} archivo${adjuntos.length > 1 ? 's' : ''}...` : save.isPending ? 'Guardando...' : editing ? 'Guardar cambios' : 'Programar'}
+            {save.isPending ? 'Guardando...' : editing ? 'Guardar cambios' : 'Programar'}
           </button>
         </div>
       </div>
@@ -499,8 +337,10 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
     onSuccess: () => { refetchArticulos(); qc.invalidateQueries({ queryKey: ['inventario'] }); },
   });
 
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const fileRefTecnico = useRef<HTMLInputElement>(null);
+  const fileRefInterna = useRef<HTMLInputElement>(null);
+  const [uploadingTecnico, setUploadingTecnico] = useState(false);
+  const [uploadingInterna, setUploadingInterna] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const eliminar = useMutation({
@@ -512,16 +352,21 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
     },
   });
 
-  const uploadFiles = async (files: FileList | null) => {
+  const uploadFiles = async (files: FileList | null, visibleTecnico: boolean) => {
     if (!files || files.length === 0) return;
+    const setUploading = visibleTecnico ? setUploadingTecnico : setUploadingInterna;
     setUploading(true);
-    await Promise.allSettled(Array.from(files).map(f => fotosApi.upload(visita.id, f)));
+    await Promise.allSettled(Array.from(files).map(f => fotosApi.upload(visita.id, f, visibleTecnico)));
     await refetch();
     setUploading(false);
   };
 
-  const fotos = adjuntos.filter(a => a.tipo === 'foto');
-  const docs  = adjuntos.filter(a => a.tipo === 'documento');
+  const memoriaTecnica = adjuntos.filter(a => a.visibleTecnico !== false);
+  const docInterna = adjuntos.filter(a => a.visibleTecnico === false);
+  const fotos = memoriaTecnica.filter(a => a.tipo === 'foto');
+  const docs  = memoriaTecnica.filter(a => a.tipo === 'documento');
+  const fotosInterna = docInterna.filter(a => a.tipo === 'foto');
+  const docsInterna  = docInterna.filter(a => a.tipo === 'documento');
 
   return (
     <>
@@ -699,79 +544,117 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
           )}
         </div>
 
-        {/* Adjuntos */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              Adjuntos {adjuntos.length > 0 && `(${adjuntos.length})`}
-            </p>
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="flex items-center gap-1.5 text-xs bg-brand text-white px-3 py-1.5 rounded-lg hover:bg-brand-dark disabled:opacity-50"
-            >
-              <Paperclip size={12} />
-              {uploading ? 'Subiendo...' : 'Añadir'}
-            </button>
-            <input ref={fileRef} type="file" multiple accept="image/*,.pdf"
-              className="hidden" onChange={e => uploadFiles(e.target.files)} />
-          </div>
-
+        {/* Documentación */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {isLoading ? (
             <p className="text-sm text-slate-400">Cargando...</p>
-          ) : adjuntos.length === 0 ? (
-            <div className="text-center py-8">
-              <Paperclip size={28} className="mx-auto text-slate-200 mb-2" />
-              <p className="text-sm text-slate-400">Sin adjuntos</p>
-              <button onClick={() => fileRef.current?.click()}
-                className="mt-2 text-xs text-brand hover:underline">
-                Añadir documentación
-              </button>
-            </div>
           ) : (
             <>
-              {/* Fotos */}
-              {fotos.length > 0 && (
-                <div>
-                  <p className="text-xs text-slate-400 mb-2">
-                    <ImageIcon size={11} className="inline mr-1" />Fotos ({fotos.length})
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {fotos.map(f => (
-                      <a key={f.id} href={f.url} target="_blank" rel="noreferrer"
-                        className="aspect-square rounded-lg overflow-hidden border border-slate-200 hover:border-brand transition-colors">
-                        <img src={f.url} alt={f.nombre ?? 'foto'}
-                          className="w-full h-full object-cover" />
-                      </a>
-                    ))}
+              {/* Memoria técnica — visible para el técnico en la app */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      Memoria técnica {memoriaTecnica.length > 0 && `(${memoriaTecnica.length})`}
+                    </p>
+                    <p className="text-[10px] text-slate-400">El técnico la ve en la app</p>
                   </div>
+                  <button
+                    onClick={() => fileRefTecnico.current?.click()}
+                    disabled={uploadingTecnico}
+                    className="flex items-center gap-1.5 text-xs bg-brand text-white px-3 py-1.5 rounded-lg hover:bg-brand-dark disabled:opacity-50"
+                  >
+                    <Paperclip size={12} />
+                    {uploadingTecnico ? 'Subiendo...' : 'Añadir'}
+                  </button>
+                  <input ref={fileRefTecnico} type="file" multiple accept="image/*,.pdf"
+                    className="hidden" onChange={e => uploadFiles(e.target.files, true)} />
                 </div>
-              )}
 
-              {/* Documentos PDF */}
-              {docs.length > 0 && (
-                <div>
-                  <p className="text-xs text-slate-400 mb-2">
-                    <FileText size={11} className="inline mr-1" />Documentos ({docs.length})
-                  </p>
-                  <ul className="space-y-1.5">
-                    {docs.map(d => (
-                      <li key={d.id}>
-                        <a href={d.url} target="_blank" rel="noreferrer"
-                          className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors group">
-                          <FileText size={15} className="text-red-500 flex-shrink-0" />
-                          <span className="text-xs text-slate-700 truncate flex-1">
-                            {d.nombre ?? 'Documento'}
-                          </span>
-                          <span className="text-[10px] text-brand opacity-0 group-hover:opacity-100 flex-shrink-0">
-                            Abrir →
-                          </span>
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
+                {memoriaTecnica.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-2">Sin archivos</p>
+                ) : (
+                  <>
+                    {fotos.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {fotos.map(f => (
+                          <a key={f.id} href={f.url} target="_blank" rel="noreferrer"
+                            className="aspect-square rounded-lg overflow-hidden border border-slate-200 hover:border-brand transition-colors">
+                            <img src={f.url} alt={f.nombre ?? 'foto'} className="w-full h-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    {docs.length > 0 && (
+                      <ul className="space-y-1.5">
+                        {docs.map(d => (
+                          <li key={d.id}>
+                            <a href={d.url} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors group">
+                              <FileText size={15} className="text-red-500 flex-shrink-0" />
+                              <span className="text-xs text-slate-700 truncate flex-1">{d.nombre ?? 'Documento'}</span>
+                              <span className="text-[10px] text-brand opacity-0 group-hover:opacity-100 flex-shrink-0">Abrir →</span>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Documentación interna — el técnico NO la ve */}
+              <div className="space-y-2 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      Documentación interna {docInterna.length > 0 && `(${docInterna.length})`}
+                    </p>
+                    <p className="text-[10px] text-slate-400">Solo oficina — el técnico no la ve</p>
+                  </div>
+                  <button
+                    onClick={() => fileRefInterna.current?.click()}
+                    disabled={uploadingInterna}
+                    className="flex items-center gap-1.5 text-xs border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <Paperclip size={12} />
+                    {uploadingInterna ? 'Subiendo...' : 'Añadir'}
+                  </button>
+                  <input ref={fileRefInterna} type="file" multiple accept="image/*,.pdf"
+                    className="hidden" onChange={e => uploadFiles(e.target.files, false)} />
                 </div>
-              )}
+
+                {docInterna.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-2">Sin archivos</p>
+                ) : (
+                  <>
+                    {fotosInterna.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {fotosInterna.map(f => (
+                          <a key={f.id} href={f.url} target="_blank" rel="noreferrer"
+                            className="aspect-square rounded-lg overflow-hidden border border-slate-200 hover:border-brand transition-colors">
+                            <img src={f.url} alt={f.nombre ?? 'foto'} className="w-full h-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    {docsInterna.length > 0 && (
+                      <ul className="space-y-1.5">
+                        {docsInterna.map(d => (
+                          <li key={d.id}>
+                            <a href={d.url} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors group">
+                              <FileText size={15} className="text-red-500 flex-shrink-0" />
+                              <span className="text-xs text-slate-700 truncate flex-1">{d.nombre ?? 'Documento'}</span>
+                              <span className="text-[10px] text-brand opacity-0 group-hover:opacity-100 flex-shrink-0">Abrir →</span>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
             </>
           )}
         </div>
