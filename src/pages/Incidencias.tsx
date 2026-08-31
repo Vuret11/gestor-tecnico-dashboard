@@ -1,16 +1,22 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { incidencias as api, instalaciones as instApi } from '../api/endpoints';
+import { incidencias as api, instalaciones as instApi, users as usersApi } from '../api/endpoints';
 import { Plus } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 
 function Modal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const { data: insts = [] } = useQuery({ queryKey: ['instalaciones'], queryFn: instApi.list });
-  const [form, setForm] = useState({ titulo: '', descripcion: '', instalacion_id: '', prioridad: 'media' });
+  const { data: users = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
+  const tecnicos = users.filter(u => u.rol === 'tecnico' && u.activo);
+  const [form, setForm] = useState({ titulo: '', descripcion: '', instalacion_id: '', prioridad: 'media', asignado_a_id: '' });
 
   const save = useMutation({
-    mutationFn: () => api.create(form as any),
+    mutationFn: () => {
+      const data: any = { ...form };
+      if (!data.asignado_a_id) delete data.asignado_a_id;
+      return api.create(data);
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['incidencias'] }); onClose(); },
   });
 
@@ -46,6 +52,14 @@ function Modal({ onClose }: { onClose: () => void }) {
             </select>
           </div>
           <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Asignar a (opcional)</label>
+            <select value={form.asignado_a_id} onChange={set('asignado_a_id')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
+              <option value="">Sin asignar</option>
+              {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+            </select>
+          </div>
+          <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Descripción</label>
             <textarea value={form.descripcion} onChange={set('descripcion')} rows={3}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
@@ -65,11 +79,19 @@ function Modal({ onClose }: { onClose: () => void }) {
 
 export default function Incidencias() {
   const { data = [], isLoading } = useQuery({ queryKey: ['incidencias'], queryFn: api.list });
+  const { data: users = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
+  const tecnicos = users.filter(u => u.rol === 'tecnico' && u.activo);
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
 
   const cerrar = useMutation({
     mutationFn: ({ id, res }: { id: string; res: string }) => api.cerrar(id, res),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['incidencias'] }),
+  });
+
+  const asignar = useMutation({
+    mutationFn: ({ id, asignado_a_id }: { id: string; asignado_a_id: string | null }) =>
+      api.update(id, { asignado_a_id } as any),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['incidencias'] }),
   });
 
@@ -93,7 +115,7 @@ export default function Incidencias() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  {['Título', 'Instalación', 'Prioridad', 'Estado', 'Fecha', ''].map(h => (
+                  {['Título', 'Instalación', 'Asignado a', 'Prioridad', 'Estado', 'Fecha', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{h}</th>
                   ))}
                 </tr>
@@ -103,6 +125,17 @@ export default function Incidencias() {
                   <tr key={inc.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-900 max-w-xs truncate">{inc.titulo}</td>
                     <td className="px-4 py-3 text-slate-600">{inc.instalacion?.nombre ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={inc.asignadoA?.id ?? ''}
+                        onChange={e => asignar.mutate({ id: inc.id, asignado_a_id: e.target.value || null })}
+                        disabled={asignar.isPending}
+                        className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-50"
+                      >
+                        <option value="">Sin asignar</option>
+                        {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                      </select>
+                    </td>
                     <td className="px-4 py-3"><Badge value={inc.prioridad} /></td>
                     <td className="px-4 py-3"><Badge value={inc.estado} /></td>
                     <td className="px-4 py-3 text-slate-500">{new Date(inc.createdAt).toLocaleDateString('es-ES')}</td>
