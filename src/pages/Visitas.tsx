@@ -104,21 +104,38 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
       if (!editing && form.plantillaId) {
         try { await checklistsApi.asignar(visita.id, form.plantillaId); } catch { /* non-fatal */ }
       }
+      let materialError = '';
       if (editing) {
-        const stockOps = [];
-        if (panelId && Number(panelCant) > 0)
-          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: panelId, cantidad: Number(panelCant) }));
-        if (inversorId && Number(inversorCant) > 0)
-          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: inversorId, cantidad: Number(inversorCant) }));
-        if (bateriaId && Number(bateriaCant) > 0)
-          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: bateriaId, cantidad: Number(bateriaCant) }));
-        if (stockOps.length > 0) await Promise.allSettled(stockOps);
-        qc.invalidateQueries({ queryKey: ['visita-articulos', visita.id] });
-        qc.invalidateQueries({ queryKey: ['inventario'] });
+        const todosArticulos = [...paneles, ...inversores, ...baterias];
+        const nombreDe = (id: string) => todosArticulos.find(a => a.id === id)?.nombre ?? 'material';
+        const intentos: [string, string, number][] = [];
+        if (panelId && Number(panelCant) > 0) intentos.push([panelId, nombreDe(panelId), Number(panelCant)]);
+        if (inversorId && Number(inversorCant) > 0) intentos.push([inversorId, nombreDe(inversorId), Number(inversorCant)]);
+        if (bateriaId && Number(bateriaCant) > 0) intentos.push([bateriaId, nombreDe(bateriaId), Number(bateriaCant)]);
+
+        if (intentos.length > 0) {
+          const resultados = await Promise.allSettled(
+            intentos.map(([articulo_id, , cantidad]) => inventarioApi.visita.add(visita.id, { articulo_id, cantidad })),
+          );
+          const fallos = resultados
+            .map((r, i) => (r.status === 'rejected' ? { nombre: intentos[i][1], err: r.reason } : null))
+            .filter((f): f is { nombre: string; err: any } => f !== null);
+          if (fallos.length > 0) {
+            materialError = fallos
+              .map(f => `${f.nombre}: ${f.err?.response?.data?.message ?? 'no se pudo añadir'}`)
+              .join(' · ');
+          }
+          qc.invalidateQueries({ queryKey: ['visita-articulos', visita.id] });
+          qc.invalidateQueries({ queryKey: ['inventario'] });
+        }
       }
       qc.invalidateQueries({ queryKey: ['visitas'] });
       qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
-      onClose();
+      if (materialError) {
+        setSaveError(materialError);
+      } else {
+        onClose();
+      }
     },
   });
 
