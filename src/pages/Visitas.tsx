@@ -362,7 +362,9 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
           {/* Notas — solo una vez creada la visita */}
           {editing && (
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Notas</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Notas <span className="font-normal text-slate-400">(el técnico la ve en la app)</span>
+              </label>
               <textarea value={form.notas} onChange={set('notas')} rows={2}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
             </div>
