@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { instalaciones as api, clientes as clientesApi, inventario as inventarioApi } from '../api/endpoints';
+import { instalaciones as api, clientes as clientesApi, inventario as inventarioApi, visitas as visitasApi } from '../api/endpoints';
 import type { Instalacion, Cliente, VisitaArticulo } from '../types';
 import { Plus, Pencil, MapPin, Trash2, Search, X, FileText, Upload, Package } from 'lucide-react';
 
@@ -12,6 +12,8 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
     queryFn: () => inventarioApi.instalacion.list(item!.id),
     enabled: !!item,
   });
+  const { data: todasVisitas = [] } = useQuery({ queryKey: ['visitas'], queryFn: visitasApi.list, enabled: !!item });
+  const atsCount = item ? todasVisitas.filter(v => v.instalacion_id === item.id && v.llevaAts).length : 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
@@ -69,19 +71,19 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
           <h2 className="font-semibold text-slate-900">{item ? 'Editar instalación' : 'Nueva instalación'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
-        <div className="p-6 grid grid-cols-2 gap-4 overflow-y-auto flex-1">
-          <div className="col-span-2">
+        <div className="p-6 grid grid-cols-3 gap-4 overflow-y-auto flex-1">
+          <div className="col-span-3">
             <label className="block text-xs font-medium text-slate-600 mb-1">Nombre</label>
             <input value={form.nombre} onChange={set('nombre')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
           </div>
 
-          <div className="col-span-2">
+          <div className="col-span-3">
             <label className="block text-xs font-medium text-slate-600 mb-1">Partner vinculado</label>
             <select
               value={form.clienteId}
@@ -95,7 +97,7 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
             </select>
           </div>
 
-          <div className="col-span-2">
+          <div className="col-span-3">
             <label className="block text-xs font-medium text-slate-600 mb-1">Dirección {!item && <span className="text-red-500">*</span>}</label>
             <input value={form.direccion} onChange={set('direccion')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
@@ -133,13 +135,13 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
               <option value="otro">Otro</option>
             </select>
           </div>
-          <div className="col-span-2">
+          <div className="col-span-3">
             <label className="block text-xs font-medium text-slate-600 mb-1">Notas</label>
             <textarea value={form.notas} onChange={set('notas')} rows={2}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none" />
           </div>
 
-          <div className="col-span-2">
+          <div className="col-span-3">
             <label className="block text-xs font-medium text-slate-600 mb-1">
               Memoria técnica {item?.memoriaTecnicaNombre && !archivo && <span className="text-slate-400 font-normal">(el técnico la ve como "Anotaciones" en la app)</span>}
             </label>
@@ -161,17 +163,28 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
           </div>
 
           {item && (
-            <div className="col-span-2">
+            <div className="col-span-3">
               <label className="block text-xs font-medium text-slate-600 mb-2 flex items-center gap-1.5">
                 <Package size={13} /> Material instalado
-                {materiales.length > 0 && <span className="text-slate-400 font-normal">({materiales.length})</span>}
+                {(materiales.length + (atsCount > 0 ? 1 : 0)) > 0 && (
+                  <span className="text-slate-400 font-normal">({materiales.length + (atsCount > 0 ? 1 : 0)})</span>
+                )}
               </label>
-              {materiales.length === 0 ? (
+              {materiales.length === 0 && atsCount === 0 ? (
                 <p className="text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                   Sin material registrado en las visitas de esta instalación.
                 </p>
               ) : (
                 <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+                  {atsCount > 0 && (
+                    <div className="flex items-center justify-between px-3 py-2 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-amber-600 text-[10px] bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">ATS</span>
+                        <span className="font-medium text-slate-800">Automatic Transfer Switch</span>
+                        {atsCount > 1 && <span className="text-slate-400 ml-1.5">× {atsCount}</span>}
+                      </div>
+                    </div>
+                  )}
                   {(materiales as VisitaArticulo[]).map(va => (
                     <div key={va.id} className="flex items-center justify-between px-3 py-2 text-xs">
                       <div>

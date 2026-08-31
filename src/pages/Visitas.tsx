@@ -581,7 +581,7 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
         <div className="px-5 py-3 border-b border-slate-100 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-              <Package size={12} /> Materiales usados {(articulos as VisitaArticulo[]).length > 0 && `(${(articulos as VisitaArticulo[]).length})`}
+              <Package size={12} /> Materiales usados {((articulos as VisitaArticulo[]).length + (visita.llevaAts ? 1 : 0)) > 0 && `(${(articulos as VisitaArticulo[]).length + (visita.llevaAts ? 1 : 0)})`}
               {visita.almacen && <span className="normal-case font-normal text-slate-400">· {visita.almacen.nombre}</span>}
             </p>
             {visita.almacen_id && (
@@ -620,8 +620,14 @@ function VisitaPanel({ visita, onClose, onEdit }: { visita: Visita; onClose: () 
             </div>
           )}
 
-          {(articulos as VisitaArticulo[]).length > 0 && (
+          {((articulos as VisitaArticulo[]).length > 0 || visita.llevaAts) && (
             <div className="space-y-1">
+              {visita.llevaAts && (
+                <div className="flex items-center gap-1.5 text-xs bg-white border border-slate-100 rounded px-2 py-1.5">
+                  <span className="font-semibold text-amber-600 text-[10px] bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">ATS</span>
+                  <span className="font-medium text-slate-800">Automatic Transfer Switch</span>
+                </div>
+              )}
               {(articulos as VisitaArticulo[]).map(va => (
                 <div key={va.id} className="flex items-center justify-between text-xs bg-white border border-slate-100 rounded px-2 py-1.5">
                   <div>
