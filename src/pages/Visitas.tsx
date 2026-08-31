@@ -113,6 +113,8 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
         if (bateriaId && Number(bateriaCant) > 0)
           stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: bateriaId, cantidad: Number(bateriaCant) }));
         if (stockOps.length > 0) await Promise.allSettled(stockOps);
+        qc.invalidateQueries({ queryKey: ['visita-articulos', visita.id] });
+        qc.invalidateQueries({ queryKey: ['inventario'] });
       }
       qc.invalidateQueries({ queryKey: ['visitas'] });
       qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
