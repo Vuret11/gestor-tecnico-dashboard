@@ -43,7 +43,13 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
   const { data: insts = [] } = useQuery({ queryKey: ['instalaciones'], queryFn: instApi.list });
   const { data: users = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
   const { data: almacenes = [] } = useQuery({ queryKey: ['almacenes'], queryFn: () => inventarioApi.almacenes.list() });
+  const { data: articulosTodos = [] } = useQuery({ queryKey: ['inventario-all'], queryFn: () => inventarioApi.articulos.list() });
   const tecnicos = users.filter(u => u.rol === 'tecnico' && u.activo);
+  const paneles = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Panel Solar' && a.activo);
+  const inversores = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Inversor' && a.activo);
+  const baterias = (articulosTodos as InventarioArticulo[]).filter(a => a.categoria === 'Batería' && a.activo);
+  const stockEnAlmacen = (art: InventarioArticulo, almacenId: string) =>
+    Number(art.stocks?.find(s => s.almacen_id === almacenId)?.stockActual ?? 0);
 
   const [form, setForm] = useState({
     instalacion_id: editing?.instalacion_id ?? '',
@@ -61,6 +67,12 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
     plantillaId: '',
   });
   const [busqInst, setBusqInst] = useState('');
+  const [panelId, setPanelId] = useState('');
+  const [panelCant, setPanelCant] = useState('1');
+  const [inversorId, setInversorId] = useState('');
+  const [inversorCant, setInversorCant] = useState('1');
+  const [bateriaId, setBateriaId] = useState('');
+  const [bateriaCant, setBateriaCant] = useState('1');
   const [saveError, setSaveError] = useState('');
 
   const instsFiltradas = insts.filter(i =>
@@ -91,6 +103,16 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
       setSaveError('');
       if (!editing && form.plantillaId) {
         try { await checklistsApi.asignar(visita.id, form.plantillaId); } catch { /* non-fatal */ }
+      }
+      if (editing) {
+        const stockOps = [];
+        if (panelId && Number(panelCant) > 0)
+          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: panelId, cantidad: Number(panelCant) }));
+        if (inversorId && Number(inversorCant) > 0)
+          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: inversorId, cantidad: Number(inversorCant) }));
+        if (bateriaId && Number(bateriaCant) > 0)
+          stockOps.push(inventarioApi.visita.add(visita.id, { articulo_id: bateriaId, cantidad: Number(bateriaCant) }));
+        if (stockOps.length > 0) await Promise.allSettled(stockOps);
       }
       qc.invalidateQueries({ queryKey: ['visitas'] });
       qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
@@ -254,6 +276,72 @@ function Modal({ onClose, editing }: { onClose: () => void; editing?: Visita }) 
                   <option key={al.id} value={al.id}>{al.nombre}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Paneles solares — solo una vez creada la visita */}
+          {editing && form.almacen_id && paneles.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Panel Solar (descuenta stock)</label>
+              <div className="flex gap-2">
+                <select value={panelId} onChange={e => setPanelId(e.target.value)}
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
+                  <option value="">— Ninguno —</option>
+                  {paneles.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre} (stock: {stockEnAlmacen(a, form.almacen_id).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                    </option>
+                  ))}
+                </select>
+                {panelId && (
+                  <input type="number" min="1" step="1" value={panelCant} onChange={e => setPanelCant(e.target.value)}
+                    placeholder="Cant." className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Inversores — solo una vez creada la visita */}
+          {editing && form.almacen_id && inversores.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Inversor (descuenta stock)</label>
+              <div className="flex gap-2">
+                <select value={inversorId} onChange={e => setInversorId(e.target.value)}
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
+                  <option value="">— Ninguno —</option>
+                  {inversores.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre} (stock: {stockEnAlmacen(a, form.almacen_id).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                    </option>
+                  ))}
+                </select>
+                {inversorId && (
+                  <input type="number" min="1" step="1" value={inversorCant} onChange={e => setInversorCant(e.target.value)}
+                    placeholder="Cant." className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Baterías — solo una vez creada la visita */}
+          {editing && form.almacen_id && baterias.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Batería (descuenta stock)</label>
+              <div className="flex gap-2">
+                <select value={bateriaId} onChange={e => setBateriaId(e.target.value)}
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white">
+                  <option value="">— Ninguna —</option>
+                  {baterias.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre} (stock: {stockEnAlmacen(a, form.almacen_id).toLocaleString('es-ES', { maximumFractionDigits: 3 })} {a.unidad})
+                    </option>
+                  ))}
+                </select>
+                {bateriaId && (
+                  <input type="number" min="1" step="1" value={bateriaCant} onChange={e => setBateriaCant(e.target.value)}
+                    placeholder="Cant." className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                )}
+              </div>
             </div>
           )}
 
