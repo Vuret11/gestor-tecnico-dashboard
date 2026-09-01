@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { instalaciones as api, clientes as clientesApi, inventario as inventarioApi, visitas as visitasApi } from '../api/endpoints';
+import { instalaciones as api, clientes as clientesApi, inventario as inventarioApi, visitas as visitasApi, checklists as checklistsApi } from '../api/endpoints';
 import type { Instalacion, Cliente, VisitaArticulo } from '../types';
-import { Plus, Pencil, MapPin, Trash2, Search, X, FileText, Upload, Package } from 'lucide-react';
+import { Plus, Pencil, MapPin, Trash2, Search, X, FileText, Upload, Package, ClipboardList } from 'lucide-react';
 
 function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
   const qc = useQueryClient();
@@ -30,6 +30,12 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
     notas: item?.notas ?? '',
     tipoInstalacion: item?.tipoInstalacion ?? '' as string,
     importe: item?.importe != null ? String(item.importe) : '',
+  });
+
+  const { data: plantillasChecklist = [] } = useQuery({
+    queryKey: ['plantillas-by-tipo', form.tipoInstalacion],
+    queryFn: () => checklistsApi.plantillasByTipo(form.tipoInstalacion),
+    enabled: !!item && !!form.tipoInstalacion,
   });
 
   const save = useMutation({
@@ -161,6 +167,37 @@ function Modal({ item, onClose }: { item?: Instalacion; onClose: () => void }) {
             </button>
             {archivoError && <p className="text-xs text-red-600 mt-1">{archivoError}</p>}
           </div>
+
+          {item && (
+            <div className="col-span-3">
+              <label className="block text-xs font-medium text-slate-600 mb-2 flex items-center gap-1.5">
+                <ClipboardList size={13} /> Plantillas de Checklist
+                {plantillasChecklist.length > 0 && (
+                  <span className="text-slate-400 font-normal">({plantillasChecklist.length})</span>
+                )}
+              </label>
+              {!form.tipoInstalacion ? (
+                <p className="text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  Selecciona un tipo de instalación para ver las plantillas aplicables.
+                </p>
+              ) : plantillasChecklist.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  No hay plantillas de checklist para este tipo de instalación.
+                </p>
+              ) : (
+                <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+                  {plantillasChecklist.map(p => (
+                    <div key={p.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                      <span className="font-medium text-slate-800">{p.nombre}</span>
+                      <span className="text-slate-400">
+                        {p.secciones?.length ?? 0} secciones · {p.secciones?.reduce((n, s) => n + s.items.length, 0) ?? 0} campos
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {item && (
             <div className="col-span-3">
