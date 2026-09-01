@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, Fragment, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { planificacion as api, visitas as visitasApi } from '../../api/endpoints';
-import type { PlanAsignacion, PlanTecnico, EstadoEspecial, Visita } from '../../types';
+import { planificacion as api, visitas as visitasApi, incidencias as incidenciasApi } from '../../api/endpoints';
+import type { PlanAsignacion, PlanTecnico, EstadoEspecial, Visita, Incidencia } from '../../types';
 import { ChevronLeft, ChevronRight, Plus, X, AlertTriangle, Plane } from 'lucide-react';
 
 const TIPO_VISITA_LABELS: Record<string, string> = {
@@ -289,6 +289,8 @@ export default function PlanSemanal() {
   // Drag & drop state (visitas amarillas)
   const draggedVisitaId = useRef<string | null>(null);
   const draggedVisitaFechaProgramada = useRef<string | null>(null);
+  // Drag & drop state (incidencias naranjas)
+  const draggedIncidenciaId = useRef<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null); // `${tecnicoId}_${fecha}`
 
   const weekStart = useMemo(() => getWeekStart(cursor), [cursor]);
@@ -314,6 +316,10 @@ export default function PlanSemanal() {
   const { data: visitasSemana = [] } = useQuery({
     queryKey: ['visitas-semana', desde, hasta],
     queryFn: () => visitasApi.semana(desde, hasta),
+  });
+  const { data: incidenciasSemana = [] } = useQuery({
+    queryKey: ['incidencias-semana', desde, hasta],
+    queryFn: () => incidenciasApi.semana(desde, hasta),
   });
   const { data: conflictos = [] } = useQuery({
     queryKey: ['plan-conflictos', desde, hasta],
@@ -346,6 +352,17 @@ export default function PlanSemanal() {
       qc.invalidateQueries({ queryKey: ['plan-conflictos'] });
       qc.invalidateQueries({ queryKey: ['visitas'] });
       qc.invalidateQueries({ queryKey: ['visitas-hoy'] });
+    },
+  });
+
+  const moverIncidencia = useMutation({
+    mutationFn: ({ id, asignado_a_id, fecha }: { id: string; asignado_a_id: string; fecha: string }) =>
+      incidenciasApi.update(id, { asignado_a_id, fecha } as any),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plan-semana'] });
+      qc.invalidateQueries({ queryKey: ['incidencias-semana'] });
+      qc.invalidateQueries({ queryKey: ['plan-conflictos'] });
+      qc.invalidateQueries({ queryKey: ['incidencias'] });
     },
   });
 
@@ -399,6 +416,21 @@ export default function PlanSemanal() {
     });
     return m;
   }, [visitasSemana, userIdToPlanTecnico]);
+
+  // Mapa: planTecnicoId → fecha → incidencias asignadas y programadas
+  const mapaIncidencias = useMemo(() => {
+    const m = new Map<string, Map<string, Incidencia[]>>();
+    incidenciasSemana.forEach(inc => {
+      if (!inc.asignado_a_id || !inc.fecha) return;
+      const ptId = userIdToPlanTecnico.get(inc.asignado_a_id);
+      if (!ptId) return;
+      if (!m.has(ptId)) m.set(ptId, new Map());
+      const fm = m.get(ptId)!;
+      if (!fm.has(inc.fecha)) fm.set(inc.fecha, []);
+      fm.get(inc.fecha)!.push(inc);
+    });
+    return m;
+  }, [incidenciasSemana, userIdToPlanTecnico]);
 
   const semanaLabel = `${weekDays[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} — ${weekDays[6].toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
@@ -512,6 +544,7 @@ export default function PlanSemanal() {
                           const cellKey = `${t.id}_${fecha}`;
                           const celdaAsigs = mapa.get(t.id)?.get(fecha) ?? [];
                           const celdaVisitas = mapaVisitas.get(t.id)?.get(fecha) ?? [];
+                          const celdaIncidencias = mapaIncidencias.get(t.id)?.get(fecha) ?? [];
                           const esFinde = i >= 5;
                           const isDragOver = dragOverKey === cellKey;
                           return (
@@ -537,6 +570,9 @@ export default function PlanSemanal() {
                                   });
                                   draggedVisitaId.current = null;
                                   draggedVisitaFechaProgramada.current = null;
+                                } else if (draggedIncidenciaId.current && t.user_id) {
+                                  moverIncidencia.mutate({ id: draggedIncidenciaId.current, asignado_a_id: t.user_id, fecha });
+                                  draggedIncidenciaId.current = null;
                                 }
                               }}
                             >
@@ -576,6 +612,22 @@ export default function PlanSemanal() {
                                     </div>
                                     <p className="text-amber-700 truncate leading-tight">{TIPO_VISITA_LABELS[v.tipo] ?? v.tipo}</p>
                                     {v.instalacion?.ciudad && <p className="text-slate-400 truncate leading-tight text-[10px]">{v.instalacion.ciudad}</p>}
+                                  </div>
+                                ))}
+                                {celdaIncidencias.map(inc => (
+                                  <div
+                                    key={inc.id}
+                                    draggable
+                                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; draggedIncidenciaId.current = inc.id; }}
+                                    onDragEnd={() => { draggedIncidenciaId.current = null; }}
+                                    className="rounded-md px-2 py-1.5 text-xs transition-colors cursor-grab active:cursor-grabbing border bg-orange-50 border-orange-200 hover:border-orange-400"
+                                  >
+                                    <div className="flex items-center gap-1 mb-0.5">
+                                      <AlertTriangle size={9} className="text-orange-500 flex-shrink-0" />
+                                      <span className="font-bold text-slate-900 truncate">{inc.titulo}</span>
+                                    </div>
+                                    <p className="text-orange-700 truncate leading-tight capitalize">Incidencia · {inc.prioridad}</p>
+                                    {inc.instalacion?.nombre && <p className="text-slate-400 truncate leading-tight text-[10px]">{inc.instalacion.nombre}</p>}
                                   </div>
                                 ))}
                                 <button

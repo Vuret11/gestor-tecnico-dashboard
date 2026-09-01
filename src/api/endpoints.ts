@@ -211,6 +211,8 @@ export const repositorio = {
 export const incidencias = {
   list: () => api.get<Incidencia[]>('/incidencias').then(r => r.data),
   abiertas: () => api.get<Incidencia[]>('/incidencias/abiertas').then(r => r.data),
+  semana: (desde: string, hasta: string) =>
+    api.get<Incidencia[]>(`/incidencias/semana?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`).then(r => r.data),
   create: (data: Partial<Incidencia>) =>
     api.post<Incidencia>('/incidencias', data).then(r => r.data),
   update: (id: string, data: Partial<Incidencia>) =>

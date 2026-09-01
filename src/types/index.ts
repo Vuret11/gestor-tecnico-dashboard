@@ -133,7 +133,9 @@ export interface Incidencia {
   instalacion_id: string;
   creadoPor: User;
   asignadoA?: User;
+  asignado_a_id?: string;
   resolucion?: string;
+  fecha?: string | null;
   createdAt: string;
   updatedAt: string;
 }

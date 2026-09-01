@@ -9,12 +9,13 @@ function Modal({ onClose }: { onClose: () => void }) {
   const { data: insts = [] } = useQuery({ queryKey: ['instalaciones'], queryFn: instApi.list });
   const { data: users = [] } = useQuery({ queryKey: ['usuarios'], queryFn: usersApi.list });
   const tecnicos = users.filter(u => u.rol === 'tecnico' && u.activo);
-  const [form, setForm] = useState({ titulo: '', descripcion: '', instalacion_id: '', prioridad: 'media', asignado_a_id: '' });
+  const [form, setForm] = useState({ titulo: '', descripcion: '', instalacion_id: '', prioridad: 'media', asignado_a_id: '', fecha: '' });
 
   const save = useMutation({
     mutationFn: () => {
       const data: any = { ...form };
       if (!data.asignado_a_id) delete data.asignado_a_id;
+      if (!data.fecha) delete data.fecha;
       return api.create(data);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['incidencias'] }); onClose(); },
@@ -60,6 +61,12 @@ function Modal({ onClose }: { onClose: () => void }) {
             </select>
           </div>
           <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Fecha programada (opcional)</label>
+            <input type="date" value={form.fecha} onChange={set('fecha')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+            <p className="text-[11px] text-slate-400 mt-1">Si se indica, la incidencia aparece en el calendario de Planificación.</p>
+          </div>
+          <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Descripción</label>
             <textarea value={form.descripcion} onChange={set('descripcion')} rows={3}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
@@ -89,9 +96,9 @@ export default function Incidencias() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['incidencias'] }),
   });
 
-  const asignar = useMutation({
-    mutationFn: ({ id, asignado_a_id }: { id: string; asignado_a_id: string | null }) =>
-      api.update(id, { asignado_a_id } as any),
+  const actualizar = useMutation({
+    mutationFn: ({ id, ...data }: { id: string; asignado_a_id?: string | null; fecha?: string | null }) =>
+      api.update(id, data as any),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['incidencias'] }),
   });
 
@@ -115,7 +122,7 @@ export default function Incidencias() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  {['Título', 'Instalación', 'Asignado a', 'Prioridad', 'Estado', 'Fecha', ''].map(h => (
+                  {['Título', 'Instalación', 'Asignado a', 'Fecha programada', 'Prioridad', 'Estado', 'Creada', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{h}</th>
                   ))}
                 </tr>
@@ -128,13 +135,22 @@ export default function Incidencias() {
                     <td className="px-4 py-3">
                       <select
                         value={inc.asignadoA?.id ?? ''}
-                        onChange={e => asignar.mutate({ id: inc.id, asignado_a_id: e.target.value || null })}
-                        disabled={asignar.isPending}
+                        onChange={e => actualizar.mutate({ id: inc.id, asignado_a_id: e.target.value || null })}
+                        disabled={actualizar.isPending}
                         className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-50"
                       >
                         <option value="">Sin asignar</option>
                         {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                       </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="date"
+                        value={inc.fecha ?? ''}
+                        onChange={e => actualizar.mutate({ id: inc.id, fecha: e.target.value || null })}
+                        disabled={actualizar.isPending}
+                        className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-50"
+                      />
                     </td>
                     <td className="px-4 py-3"><Badge value={inc.prioridad} /></td>
                     <td className="px-4 py-3"><Badge value={inc.estado} /></td>
