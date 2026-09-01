@@ -69,6 +69,8 @@ export interface Instalacion {
   memoriaTecnicaUrl?: string;
   memoriaTecnicaNombre?: string;
   tipoInstalacion?: TipoInstalacion | null;
+  checklistPlantillaId?: string | null;
+  checklistPlantilla?: ChecklistPlantilla | null;
   importe?: number;
   activo: boolean;
   createdAt: string;
