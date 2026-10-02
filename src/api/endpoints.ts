@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo, InventarioArticulo, VisitaArticulo, Almacen, ProyectoIngenieria } from '../types';
+import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo, InventarioArticulo, VisitaArticulo, Almacen, ProyectoIngenieria , Tarea, Legalizacion} from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -26,6 +26,27 @@ export const ingenieria = {
   update: (id: string, data: Partial<ProyectoIngenieria>) =>
     api.patch<ProyectoIngenieria>(`/ingenieria/${id}`, data).then(r => r.data),
   remove: (id: string) => api.delete(`/ingenieria/${id}`),
+};
+
+export const tareas = {
+  list: (filtros?: { proyecto_id?: string; abiertas?: boolean }) =>
+    api.get<Tarea[]>('/tareas', { params: filtros ?? {} }).then(r => r.data),
+  create: (data: Partial<Tarea>) => api.post<Tarea>('/tareas', data).then(r => r.data),
+  update: (id: string, data: Partial<Tarea>) => api.patch<Tarea>(`/tareas/${id}`, data).then(r => r.data),
+  remove: (id: string) => api.delete(`/tareas/${id}`),
+  carga: () => api.get<{ nombre: string; abiertas: number; hechas: number; total: number }[]>('/tareas/resumen/operarios').then(r => r.data),
+};
+
+export const legalizaciones = {
+  list: (filtros?: { estado?: string }) =>
+    api.get<Legalizacion[]>('/legalizaciones', { params: filtros ?? {} }).then(r => r.data),
+  resumen: () => api.get<{
+    total: number; porEstado: Record<string, number>; porProvincia: Record<string, number>;
+    porResponsable: Record<string, number>; documentos: { listos: number; total: number }; parados: number;
+  }>('/legalizaciones/resumen').then(r => r.data),
+  create: (data: Partial<Legalizacion>) => api.post<Legalizacion>('/legalizaciones', data).then(r => r.data),
+  update: (id: string, data: Partial<Legalizacion>) => api.patch<Legalizacion>(`/legalizaciones/${id}`, data).then(r => r.data),
+  remove: (id: string) => api.delete(`/legalizaciones/${id}`),
 };
 
 export const clientes = {
@@ -219,4 +240,21 @@ export const incidencias = {
     api.patch<Incidencia>(`/incidencias/${id}`, data).then(r => r.data),
   cerrar: (id: string, resolucion: string) =>
     api.patch<Incidencia>(`/incidencias/${id}/cerrar`, { resolucion }).then(r => r.data),
+};
+
+export interface MaquinaCatalogo {
+  id: number;
+  id_externo?: number | null;
+  fabricante?: string | null;
+  gama?: string | null;
+  modelo?: string | null;
+  potencia_calorifica_kw?: number | null;
+  potencia_frigorifica_kw?: number | null;
+}
+
+export const maquinasApi = {
+  listar: (fabricante?: string) =>
+    api.get<MaquinaCatalogo[]>('/maquinas', { params: fabricante ? { fabricante } : {} }).then(r => r.data),
+  fabricantes: () =>
+    api.get<{ fabricante: string; cuantas: number }[]>('/maquinas/fabricantes').then(r => r.data),
 };

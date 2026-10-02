@@ -44,6 +44,10 @@ export interface ProyectoIngenieria {
   direccion?: string;
   provincia?: string;
   notas?: string;
+  disciplinas?: string[];
+  responsables?: string[];
+  jefe_obra?: string;
+  jefe_obra_contacto?: string;
   tecnico_id?: string;
   tecnico?: User;
   activo: boolean;
@@ -342,4 +346,62 @@ export interface RepoArchivo {
 export interface AuthResponse {
   access_token: string;
   user: Pick<User, 'id' | 'nombre' | 'email' | 'rol' | 'departamento' | 'modulosAcceso'>;
+}
+
+
+export type EstadoTarea = 'pendiente' | 'en_curso' | 'hecha';
+
+export interface Tarea {
+  id: string;
+  titulo: string;
+  descripcion?: string;
+  estado: EstadoTarea;
+  disciplina?: string;
+  responsables?: string[];
+  fecha_limite?: string;
+  completada_en?: string;
+  proyecto_id?: string;
+  operario_id?: string;
+  createdAt: string;
+}
+
+
+export type EstadoLegalizacion = 'bloqueado' | 'con_avisos' | 'listo_presentar' | 'presentado' | 'inscrito';
+
+export interface Legalizacion {
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+  creado_por?: string | null;
+  tipo_emisor?: string | null;
+  comunidad?: string | null;
+  superficie?: number | null;
+  tipo_edificio?: string | null;
+  dormitorios?: number | null;
+  clasificacion_emplazamiento?: string | null;
+  clasificacion_local?: string | null;
+  sala_maquinas?: string | null;
+  num_obra?: string;
+  partner?: string;
+  nif?: string;
+  direccion?: string;
+  cp?: string;
+  id: string;
+  id_externo?: number;
+  cliente?: string;
+  municipio?: string;
+  provincia?: string;
+  oca?: string;
+  maquina?: string;
+  potencia?: number;
+  hidraulica?: boolean;
+  estado: EstadoLegalizacion;
+  n_listo: number;
+  n_avisos: number;
+  n_bloqueado: number;
+  n_total: number;
+  motivo?: string;
+  dias?: number;
+  parado: boolean;
+  notas?: string;
+  responsable?: string;
 }
