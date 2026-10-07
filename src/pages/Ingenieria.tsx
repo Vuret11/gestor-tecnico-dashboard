@@ -584,11 +584,6 @@ function tipoInstalacion(e: Legalizacion): 'clima' | 'fotovoltaica' {
 }
 const TIPO_INST_LABELS: Record<string, string> = { clima: 'Clima', fotovoltaica: 'Fotovoltaica' };
 
-const ESTADO_LEG_BARRAS: Record<string, string> = {
-  bloqueado: 'bg-red-400', con_avisos: 'bg-amber-400', listo_presentar: 'bg-green-500',
-  presentado: 'bg-blue-500', inscrito: 'bg-slate-400',
-};
-
 // Los datos medidos en obra (fechas y presiones de las pruebas del MOD-318, EER y COP medidos) y los
 // cálculos del CTE ya no se piden en el alta: los pone el programa. La lista de claves y sus rótulos
 // se fueron con el desplegable que el instalador mandó quitar el 2-oct-2026 («todo esto no debería
@@ -936,13 +931,6 @@ function ApartadoLegalizaciones() {
    */
   const editandoVivo = editando ? (exps.find(x => x.id === editando.id) ?? editando) : null;
 
-  const porEstado = Object.entries(resumen?.porEstado ?? {})
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, n]) => [ESTADO_LEG_LABELS[k] ?? k, n, ESTADO_LEG_BARRAS[k] ?? 'bg-slate-400'] as [string, number, string]);
-  const porProvincia = Object.entries(resumen?.porProvincia ?? {})
-    .sort((a, b) => b[1] - a[1]).slice(0, 8)
-    .map(([k, n]) => [k, n, 'bg-slate-400'] as [string, number, string]);
-
   const cuentaTipo = (t: 'clima' | 'fotovoltaica') => exps.filter(e => tipoInstalacion(e) === t).length;
 
   const visibles = exps.filter(e => {
@@ -1272,12 +1260,6 @@ function ApartadoLegalizaciones() {
 
       {/* Auditorías: historial descargable por semana, mes o año, y por partner o tipo (Salva, 7-oct-2026) */}
       <AuditoriaLegalizaciones />
-
-      {/* Los dos resúmenes de siempre, ahora al final de la pantalla (Salva, 7-oct-2026) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Barras titulo="Expedientes por estado" datos={porEstado} />
-        <Barras titulo="Expedientes por provincia" datos={porProvincia} />
-      </div>
 
       {docsDe && <DocumentosTramite tramite={docsDe} onClose={() => setDocsDe(null)} />}
       {nuevoAbierto && (

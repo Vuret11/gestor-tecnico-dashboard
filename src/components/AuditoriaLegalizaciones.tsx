@@ -31,8 +31,10 @@ const USOS: Record<string, string> = {
 
 /** El estado, igual que en el listado: sale del propio trámite y cambia solo (Salva, 7-oct-2026). */
 const estadoDe = (t: Legalizacion) => {
-  if (t.estado === 'bloqueado') return 'bloqueado';
-  return (t.etapas_hechas ?? []).includes('finalizado') ? 'finalizado' : 'en_curso';
+  // Igual que en el listado: finalizada por su fecha de finalización o por la etapa «Finalizado»,
+  // aunque la base la tenga por bloquear (Salva, 7-oct-2026).
+  if (t.fecha_fin || (t.etapas_hechas ?? []).includes('finalizado')) return 'finalizado';
+  return t.estado === 'bloqueado' ? 'bloqueado' : 'en_curso';
 };
 
 const ESTADOS: Record<string, string> = {

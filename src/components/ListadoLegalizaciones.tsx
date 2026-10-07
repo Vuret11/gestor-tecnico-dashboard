@@ -23,8 +23,11 @@ import type { Legalizacion } from '../types';
 type EstadoListado = 'finalizado' | 'en_curso' | 'bloqueado';
 
 const estadoDe = (e: Legalizacion): EstadoListado => {
-  if (e.estado === 'bloqueado') return 'bloqueado';
-  return (e.etapas_hechas ?? []).includes('finalizado') ? 'finalizado' : 'en_curso';
+  // Está finalizada si tiene fecha de finalización (el botón «Finalizar trámite») o si tiene marcada la
+  // etapa «Finalizado». Manda eso antes que el «bloqueado» de la base (Salva, 7-oct-2026: «la
+  // instalación de Salva está finalizada y en el listado sale bloqueada»).
+  if (e.fecha_fin || (e.etapas_hechas ?? []).includes('finalizado')) return 'finalizado';
+  return e.estado === 'bloqueado' ? 'bloqueado' : 'en_curso';
 };
 
 const ESTADOS: Record<EstadoListado, { etiqueta: string; fila: string; punto: string }> = {
