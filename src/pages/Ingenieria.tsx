@@ -6,6 +6,7 @@ import type { ProyectoIngenieria, TipoProyecto, EstadoProyecto, Tarea, Legalizac
 import { Plus, Search, X, Pencil, Zap, Wrench, CalendarDays, Euro, Cpu, Check, Trash2, FileText, ChevronRight } from 'lucide-react';
 import { EtapasLegalizacion } from '../components/EtapasLegalizacion';
 import { ListadoLegalizaciones } from '../components/ListadoLegalizaciones';
+import { AuditoriaLegalizaciones } from '../components/AuditoriaLegalizaciones';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import DocumentosTramite from '../components/DocumentosTramite';
@@ -529,6 +530,42 @@ function DetalleProyecto({ p, onClose, onEdit, disciplinaActual }: {
 }
 
 // ── Apartado Legalizaciones (dentro de Ingeniería) ───────────────────────────
+/**
+ * Los PARTNER con los que se trabaja, para elegirlos en el desplegable del alta (los dictó Salva el
+ * 7-oct-2026: «en la creación de legalización debe haber un desplegable de Partner: Solfy, Oscagas,
+ * B2C, Hidalgas y Obra Nueva»). Si aparece uno nuevo, se añade a esta lista.
+ */
+const PARTNERS: readonly (readonly [string, string])[] = [
+  ['Solfy', 'Solfy'],
+  ['Oscagas', 'Oscagas'],
+  ['B2C', 'B2C'],
+  ['Hidalgas', 'Hidalgas'],
+  ['Obra Nueva', 'Obra Nueva'],
+];
+
+/** Comunidades autónomas de España, para el desplegable (Salva, 7-oct-2026: «debe ser desplegable»). */
+const COMUNIDADES: readonly (readonly [string, string])[] = [
+  ['Andalucía', 'Andalucía'],
+  ['Aragón', 'Aragón'],
+  ['Asturias', 'Asturias'],
+  ['Baleares', 'Illes Balears'],
+  ['Canarias', 'Canarias'],
+  ['Cantabria', 'Cantabria'],
+  ['Castilla-La Mancha', 'Castilla-La Mancha'],
+  ['Castilla y León', 'Castilla y León'],
+  ['Cataluña', 'Cataluña'],
+  ['Ceuta', 'Ceuta'],
+  ['Comunidad Valenciana', 'Comunidad Valenciana'],
+  ['Extremadura', 'Extremadura'],
+  ['Galicia', 'Galicia'],
+  ['La Rioja', 'La Rioja'],
+  ['Madrid', 'Comunidad de Madrid'],
+  ['Melilla', 'Melilla'],
+  ['Murcia', 'Región de Murcia'],
+  ['Navarra', 'Navarra'],
+  ['País Vasco', 'País Vasco'],
+];
+
 const ESTADO_LEG_LABELS: Record<string, string> = {
   bloqueado: 'Bloqueado', con_avisos: 'Con avisos', listo_presentar: 'Listo para presentar',
   presentado: 'Presentado', inscrito: 'Inscrito',
@@ -988,6 +1025,10 @@ function ApartadoLegalizaciones() {
       }
       await qc.invalidateQueries({ queryKey: ['legalizaciones'] });
       await qc.invalidateQueries({ queryKey: ['legalizaciones-listado'] });
+      // Y los botones de ESA ficha, que tienen su propia consulta: si no, la tarjeta cambia de columna
+      // pero los botones siguen enseñando el estado viejo (lo que le pasó a Salva el 7-oct-2026: la
+      // ficha en «Subidas portal» con el botón de Subida Portal sin marcar).
+      await qc.invalidateQueries({ queryKey: ['etapas-tramite', id] });
     } catch (err: any) {
       setErrorEtapa(
         err?.response?.data?.message
@@ -1042,11 +1083,6 @@ function ApartadoLegalizaciones() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Barras titulo="Expedientes por estado" datos={porEstado} />
-        <Barras titulo="Expedientes por provincia" datos={porProvincia} />
-      </div>
-
       <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap gap-3 items-center">
         <button onClick={() => { limpiarFormulario(); setEditando(null); setNuevoAbierto(true); }}
           className="flex items-center gap-2 px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand-dark">
@@ -1099,7 +1135,12 @@ function ApartadoLegalizaciones() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {COLUMNAS_ETAPA.map((col, i) => {
-          const enColumna = visibles.filter(t => columnaDeEtapa(t) === i);
+          // Las que llevan MÁS tiempo en esa etapa, arriba: se ordena por la fecha en la que se
+          // marcó la etapa en la que están (Salva, 7-oct-2026).
+          const enColumna = visibles
+            .filter(t => columnaDeEtapa(t) === i)
+            .sort((a, b) =>
+              (a.etapa_fecha ?? a.fecha_inicio ?? '').localeCompare(b.etapa_fecha ?? b.fecha_inicio ?? ''));
           return (
             <div
               key={col.etapa}
@@ -1134,14 +1175,22 @@ function ApartadoLegalizaciones() {
                       setArrastrando(e.id);
                     }}
                     onDragEnd={() => setArrastrando(null)}
-                    className={`bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-2 cursor-grab active:cursor-grabbing hover:border-brand/40 ${
+                    className={`bg-white rounded-xl border border-slate-200 p-2.5 flex flex-col gap-1.5 cursor-grab active:cursor-grabbing hover:border-brand/40 ${
                       arrastrando === e.id ? 'opacity-50' : ''
                     } ${moviendoEtapa === e.id ? 'opacity-60' : ''}`}
                   >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs text-slate-400">Expediente {e.id_externo ?? '—'}</p>
-                <p className="font-semibold text-slate-900 truncate">{e.cliente || 'Sin cliente'}</p>
+                <p className="font-semibold text-slate-900 truncate">
+                  {/* El partner, delante del nombre (Salva, 7-oct-2026) */}
+                  {e.partner && (
+                    <span className="text-[10px] font-medium text-brand border border-brand/30 bg-brand/5 rounded px-1 py-0.5 mr-1 align-middle">
+                      {(e.partner ?? '').trim()}
+                    </span>
+                  )}
+                  {e.cliente || 'Sin cliente'}
+                </p>
                 <p className="text-xs text-slate-500 truncate">
                   {[e.municipio, e.provincia].filter(Boolean).join(' · ') || 'Sin ubicación'}
                 </p>
@@ -1151,60 +1200,64 @@ function ApartadoLegalizaciones() {
               </span>
             </div>
 
-            <div className="text-xs text-slate-600 space-y-1">
+            <div className="text-[11px] text-slate-600 space-y-1">
               {e.maquina && <p className="truncate">🔧 {e.maquina}{e.hidraulica ? ' · hidráulica' : ''}</p>}
               <p>📄 {e.n_listo} de {e.n_total} documentos{e.n_bloqueado ? ` · ${e.n_bloqueado} bloqueados` : ''}</p>
               {e.motivo && <p className="text-amber-700 line-clamp-2">⚠︎ {e.motivo}</p>}
               {e.dias != null && <p className="text-slate-400">{e.dias} días en este estado</p>}
             </div>
 
-            <label className="text-[11px] text-slate-500 mt-1">Ingeniero responsable</label>
+            <label className="text-[10px] text-slate-500">Ingeniero responsable</label>
             <select value={e.responsable ?? ''}
               onChange={ev => asignar.mutate({ id: e.id, responsable: ev.target.value })}
-              className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand">
+              className="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px] bg-white focus:outline-none focus:ring-2 focus:ring-brand">
               <option value="">— Sin asignar —</option>
               {PERSONAL_INGENIERIA.map(n => <option key={n} value={n}>{n}</option>)}
             </select>
-            <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1">
+            <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
               <span>Inicio: {e.fecha_inicio ? new Date(e.fecha_inicio).toLocaleDateString('es-ES') : '—'}</span>
               <span>Fin: {e.fecha_fin ? new Date(e.fecha_fin).toLocaleDateString('es-ES') : '—'}</span>
               {e.creado_por && <span className="truncate">· {e.creado_por}</span>}
             </div>
             {ultimaObservacion(e) && (
-              <p className="text-[11px] text-slate-600 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5 line-clamp-2"
+              <p className="text-[10px] text-slate-600 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 line-clamp-1"
                 title={observacionesDe(e).join('\n')}>
                 📝 {ultimaObservacion(e)}
               </p>
             )}
             {/* Las tres etapas: Inicio, Subida Portal y Finalizado (con su registro) */}
             <EtapasLegalizacion tramiteId={e.id} />
-            <button
-              onClick={() => setDocsDe(e)}
-              className="mt-1 w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-1.5">
-              <FileText size={13} /> Documentos
-            </button>
-            <button
-              onClick={() => abrirEdicion(e)}
-              className="mt-1 w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-1.5">
-              <Pencil size={13} /> Editar trámite
-            </button>
-            <button
-              onClick={() => finalizar.mutate({ id: e.id, fin: e.fecha_fin ? null : new Date().toISOString().slice(0, 10) })}
-              disabled={finalizar.isPending}
-              className={`mt-1 w-full px-3 py-1.5 text-xs rounded-lg border ${e.fecha_fin ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-green-200 text-green-700 hover:bg-green-50'}`}>
-              {e.fecha_fin ? 'Reabrir trámite' : 'Finalizar trámite'}
-            </button>
-            {puedeBorrar && (
+            <div className="grid grid-cols-2 gap-1.5 mt-1">
               <button
-                onClick={() => {
-                  if (window.confirm(`Eliminar el trámite de ${e.cliente || 'este cliente'} (obra ${e.num_obra || 'sin número'})?` +
-                    ' No se puede deshacer.')) borrar.mutate(e.id);
-                }}
-                disabled={borrar.isPending}
-                className="mt-1 w-full px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50">
-                Eliminar trámite
+                onClick={() => setDocsDe(e)}
+                className="w-full px-2 py-1 text-[11px] rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-1">
+                <FileText size={12} /> Documentos
               </button>
-            )}
+              <button
+                onClick={() => abrirEdicion(e)}
+                className="w-full px-2 py-1 text-[11px] rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-1">
+                <Pencil size={12} /> Editar
+              </button>
+              <button
+                onClick={() => finalizar.mutate({ id: e.id, fin: e.fecha_fin ? null : new Date().toISOString().slice(0, 10) })}
+                disabled={finalizar.isPending}
+                className={`w-full px-2 py-1 text-[11px] rounded-lg border ${e.fecha_fin ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-green-200 text-green-700 hover:bg-green-50'}`}>
+                {e.fecha_fin ? 'Reabrir' : 'Finalizar'}
+              </button>
+              {puedeBorrar ? (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Eliminar el trámite de ${e.cliente || 'este cliente'} (obra ${e.num_obra || 'sin número'})?` +
+                      ' No se puede deshacer.')) borrar.mutate(e.id);
+                  }}
+                  disabled={borrar.isPending}
+                  className="w-full px-2 py-1 text-[11px] border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50">
+                  Eliminar
+                </button>
+              ) : (
+                <span />
+              )}
+            </div>
                   </div>
                 ))}
                 {enColumna.length === 0 && (
@@ -1221,6 +1274,15 @@ function ApartadoLegalizaciones() {
       {/* El listado en tabla, al final de la pantalla (Salva, 7-oct-2026: como su hoja) */}
       <ListadoLegalizaciones />
 
+      {/* Auditorías: historial descargable por semana, mes o año, y por partner o tipo (Salva, 7-oct-2026) */}
+      <AuditoriaLegalizaciones />
+
+      {/* Los dos resúmenes de siempre, ahora al final de la pantalla (Salva, 7-oct-2026) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Barras titulo="Expedientes por estado" datos={porEstado} />
+        <Barras titulo="Expedientes por provincia" datos={porProvincia} />
+      </div>
+
       {docsDe && <DocumentosTramite tramite={docsDe} onClose={() => setDocsDe(null)} />}
       {nuevoAbierto && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -1231,13 +1293,40 @@ function ApartadoLegalizaciones() {
                 <p className="text-xs text-slate-500">
                   {editando
                     ? `Corrigiendo el trámite de ${editando.cliente || 'este cliente'}; al guardar se actualiza el mismo expediente`
-                    : 'Solo los datos imprescindibles para legalizar; lo demás, en «Más datos»'}
+                    : 'Los datos de gestión van primero; lo demás, si hace falta, después'}
                 </p>
               </div>
               <button onClick={cerrarFormulario} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
             </div>
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {bloque('Instalación', (
+                            {/* Datos de gestión: van los PRIMEROS y siempre a la vista (Salva, 7-oct-2026: «esta parte
+                  debe estar fija, no como opcional y al principio»). Antes era el desplegable «Más datos
+                  (opcional)». Lo que no se ponga sale en blanco en los documentos: no se inventa nada. */}
+              <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold text-slate-700">Datos de gestión</p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Estos tres no salen en los impresos, pero se guardan con el trámite. Lo que no se ponga
+                  sale en blanco en los documentos: no se inventa nada.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  {campo('num_obra', 'Número de obra')}
+                  {selector('partner', 'Partner', PARTNERS)}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                      ¿Instalación anterior al RD 1027/2007?
+                    </label>
+                    <select value={nuevo.es_anterior_rd}
+                      onChange={e => setNuevo(n => ({ ...n, es_anterior_rd: e.target.value }))}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
+                      <option value="">— Sin indicar —</option>
+                      <option value="si">Sí, es anterior</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+{bloque('Instalación', (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {selector('tipo_instalacion', 'Tipo de instalación', TIPOS_INSTALACION)}
                   {selector('tipo_energia', 'Tipo de energía (nunca las dos)', TIPOS_ENERGIA)}
@@ -1251,7 +1340,7 @@ function ApartadoLegalizaciones() {
                   {campo('cliente', 'Nombre / razón social *')}
                   {campo('nif', 'DNI / CIF')}
                   {/* El teléfono y el email del titular SÍ van en los impresos (puntos 1 y 3 del
-                      MOD-315, y el Certificado RSIF y el IF-190). Estaban escondidos en «Más datos»,
+                      MOD-315, y el Certificado RSIF y el IF-190). Estaban escondidos en «Datos de gestión»,
                       que dice que no van: se quedaban en blanco en todos los documentos. */}
                   {campo('telefono', 'Teléfono del titular')}
                   {campo('email', 'Email del titular')}
@@ -1277,7 +1366,19 @@ function ApartadoLegalizaciones() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                     {campo('cp', 'Código postal')}
                     {campo('municipio', 'Municipio')}
-                    {campo('comunidad', 'Comunidad autónoma')}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Comunidad autónoma</label>
+                      <select value={nuevo.comunidad}
+                        onChange={e => setNuevo(n => ({ ...n, comunidad: e.target.value }))}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
+                        <option value="">— Elegir comunidad —</option>
+                        {/* Si el trámite trae un valor antiguo (por ejemplo un código), no se pierde: se enseña arriba. */}
+                        {nuevo.comunidad && !COMUNIDADES.some(([valor]) => valor === nuevo.comunidad) && (
+                          <option value={nuevo.comunidad}>{nuevo.comunidad} (lo que hay guardado)</option>
+                        )}
+                        {COMUNIDADES.map(([valor, nombre]) => <option key={valor} value={valor}>{nombre}</option>)}
+                      </select>
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                     {selector('provincia', 'Provincia', PROVINCIAS)}
@@ -1423,32 +1524,6 @@ function ApartadoLegalizaciones() {
                   {campo('acs_volumen_acumulador_l', 'Capacidad del depósito de ACS (litros)', 'number')}
                 </div>
               ))}
-              <details className="sm:col-span-2 border border-slate-200 rounded-lg p-3 bg-slate-50">
-                <summary className="text-xs font-medium text-slate-700 cursor-pointer">
-                  Más datos (opcional) — se puede completar después editando el trámite
-                </summary>
-                <p className="text-[11px] text-slate-500 mt-2">
-                  Datos de gestión que no necesitan los impresos: se pueden rellenar ahora o más
-                  tarde. Lo que no se ponga sale en blanco en los documentos: no se inventa nada.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                  {campo('num_obra', 'Número de obra')}
-                  {campo('partner', 'Partner')}
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                      ¿Instalación anterior al RD 1027/2007?
-                    </label>
-                    <select value={nuevo.es_anterior_rd}
-                      onChange={e => setNuevo(n => ({ ...n, es_anterior_rd: e.target.value }))}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand">
-                      <option value="">— Sin indicar —</option>
-                      <option value="si">Sí, es anterior</option>
-                      <option value="no">No</option>
-                    </select>
-                  </div>
-                </div>
-              </details>
-
               {/* Lo que el programa pone solo, y por eso no se pide:
                   - el Qusable y el Eres, que salen de la instalación (provincia, dormitorios y la
                     máquina) con el CTE DB-HE4;
@@ -1519,7 +1594,7 @@ function ApartadoLegalizaciones() {
               ) : faltaParaDocumentos.length > 0 ? (
                 <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 sm:mb-0 sm:max-w-md">
                   Puedes guardarlo ya, pero sin {faltaParaDocumentos.join(', ')} los documentos oficiales
-                  saldrán con huecos. Se completa en «Más datos» o editando el trámite más adelante.
+                  saldrán con huecos. Se completa en «Datos de gestión» o editando el trámite más adelante.
                 </p>
               ) : (
                 <p className="text-[11px] text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-3 sm:mb-0">

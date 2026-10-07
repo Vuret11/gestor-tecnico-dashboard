@@ -741,4 +741,11 @@ export interface Legalizacion {
    * ficha (Salva, 7-oct-2026).
    */
   etapas_hechas?: EtapaTramiteNombre[];
+  /** Si el trámite está facturado (columna «Facturada» del listado). */
+  facturada?: boolean;
+  /**
+   * Cuándo se marcó la etapa en la que está ahora (para poner arriba lo que lleva más tiempo en esa
+   * columna). Si no tiene ninguna etapa marcada, es la fecha de inicio del expediente.
+   */
+  etapa_fecha?: string | null;
 }

@@ -23,7 +23,17 @@ export function EtapasLegalizacion({ tramiteId }: { tramiteId: string }) {
     mutationFn: ({ etapa, hecha }: { etapa: EtapaTramiteNombre; hecha: boolean }) =>
       legApi.marcarEtapa(tramiteId, etapa, hecha),
     // El API devuelve el estado completo y el registro ya actualizados.
-    onSuccess: (datos) => qc.setQueryData(['etapas-tramite', tramiteId], datos),
+    onSuccess: async (datos) => {
+      qc.setQueryData(['etapas-tramite', tramiteId], datos);
+      /**
+       * Y se refresca la LISTA. Lo pidió Salva el 7-oct-2026: «si se marca un estado la tarjeta debe
+       * cambiar automáticamente» — la tarjeta (y la columna en la que está) salen de la lista de
+       * instalaciones, no de este componente, así que sin esto el botón se marcaba pero la ficha se
+       * quedaba en la columna de antes hasta recargar.
+       */
+      await qc.invalidateQueries({ queryKey: ['legalizaciones'] });
+      await qc.invalidateQueries({ queryKey: ['legalizaciones-listado'] });
+    },
   });
 
   /** Fecha y hora cortas, en español («07/10/26, 16:07»). */
