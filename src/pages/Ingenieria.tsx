@@ -932,7 +932,12 @@ function ApartadoLegalizaciones() {
     const delMes = exps.filter(e => (e.fecha_inicio ?? '').slice(0, 7) === clave);
     const clima = delMes.filter(e => tipoInstalacion(e) === 'clima').length;
     return {
-      etiqueta: ahora.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+      // «Octubre de 2026», con la inicial en mayúscula solo en el mes (con `capitalize` de CSS salía
+      // «Octubre De 2026»).
+      etiqueta: (() => {
+        const mes = ahora.toLocaleDateString('es-ES', { month: 'long' });
+        return `${mes.charAt(0).toUpperCase()}${mes.slice(1)} de ${ahora.getFullYear()}`;
+      })(),
       total: delMes.length,
       clima,
       fotovoltaica: delMes.length - clima,
@@ -945,7 +950,7 @@ function ApartadoLegalizaciones() {
         <div className="bg-white rounded-xl border border-brand/30 bg-brand/5 p-4">
           <p className="text-xs text-slate-500">Legalizaciones de este mes</p>
           <p className="text-2xl font-semibold text-slate-900">{mesDeHoy.total}</p>
-          <p className="text-[11px] text-slate-500 capitalize">{mesDeHoy.etiqueta}</p>
+          <p className="text-[11px] text-slate-500">{mesDeHoy.etiqueta}</p>
           <p className="text-[11px] text-slate-500">
             Clima {mesDeHoy.clima} · Fotovoltaica {mesDeHoy.fotovoltaica}
           </p>
