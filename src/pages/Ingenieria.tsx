@@ -5,6 +5,8 @@ import { ingenieria as api, tareas as tareasApi, legalizaciones as legApi, maqui
 import type { ProyectoIngenieria, TipoProyecto, EstadoProyecto, Tarea, Legalizacion } from '../types';
 import { Plus, Search, X, Pencil, Zap, Wrench, CalendarDays, Euro, Cpu, Check, Trash2, FileText, ChevronRight } from 'lucide-react';
 import { EtapasLegalizacion } from '../components/EtapasLegalizacion';
+import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import DocumentosTramite from '../components/DocumentosTramite';
 import ApartadoHomologaciones from '../components/ApartadoHomologaciones';
 import SeguimientoObras from '../components/SeguimientoObras';
@@ -590,6 +592,11 @@ type MaquinaElegida = { maquina_id: string; etiqueta: string; unidades: number; 
 
 function ApartadoLegalizaciones() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { puede } = usePermissions();
+  // Archivar instalaciones: admin y oficina, y los ingenieros que tengan el permiso uno a uno (los
+  // ingenieros son 6; el rol `tecnico` lo llevan más de veinte personas del proyecto anterior).
+  const puedeBorrar = puede('borrar_legalizaciones') || user?.rol === 'admin' || user?.rol === 'oficina';
   const { data: exps = [], isLoading } = useQuery({ queryKey: ['legalizaciones'], queryFn: () => legApi.list() });
   const { data: resumen } = useQuery({ queryKey: ['legalizaciones-resumen'], queryFn: () => legApi.resumen() });
   const [filtro, setFiltro] = useState<string>('');
@@ -1033,15 +1040,17 @@ function ApartadoLegalizaciones() {
               className={`mt-1 w-full px-3 py-1.5 text-xs rounded-lg border ${e.fecha_fin ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-green-200 text-green-700 hover:bg-green-50'}`}>
               {e.fecha_fin ? 'Reabrir trámite' : 'Finalizar trámite'}
             </button>
-            <button
-              onClick={() => {
-                if (window.confirm(`Eliminar el trámite de ${e.cliente || 'este cliente'} (obra ${e.num_obra || 'sin número'})?` +
-                  ' No se puede deshacer.')) borrar.mutate(e.id);
-              }}
-              disabled={borrar.isPending}
-              className="mt-1 w-full px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50">
-              Eliminar trámite
-            </button>
+            {puedeBorrar && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Eliminar el trámite de ${e.cliente || 'este cliente'} (obra ${e.num_obra || 'sin número'})?` +
+                    ' No se puede deshacer.')) borrar.mutate(e.id);
+                }}
+                disabled={borrar.isPending}
+                className="mt-1 w-full px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50">
+                Eliminar trámite
+              </button>
+            )}
           </div>
         ))}
         {!isLoading && visibles.length === 0 && (
