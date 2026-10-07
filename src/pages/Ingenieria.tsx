@@ -1256,10 +1256,10 @@ function ApartadoLegalizaciones() {
       </div>
 
       {/* El listado en tabla, al final de la pantalla (Salva, 7-oct-2026: como su hoja) */}
-      <ListadoLegalizaciones />
+      <ListadoLegalizaciones tipoApartado={tipoInst} />
 
       {/* Auditorías: historial descargable por semana, mes o año, y por partner o tipo (Salva, 7-oct-2026) */}
-      <AuditoriaLegalizaciones />
+      <AuditoriaLegalizaciones tipoApartado={tipoInst} />
 
       {docsDe && <DocumentosTramite tramite={docsDe} onClose={() => setDocsDe(null)} />}
       {nuevoAbierto && (

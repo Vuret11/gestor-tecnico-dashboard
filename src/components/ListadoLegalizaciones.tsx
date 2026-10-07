@@ -20,6 +20,14 @@ import type { Legalizacion } from '../types';
  * no de un campo escrito a mano, así cambia solo al mover la tarjeta de columna (Salva, 7-oct-2026):
  * finalizada en verde, en curso en gris y bloqueada en rojo.
  */
+/** ¿Es de clima o de fotovoltaica? Igual que en el apartado: mira la máquina y el motivo. */
+type TipoInstal = 'clima' | 'fotovoltaica' | 'todas';
+
+const tipoInstalacion = (e: Legalizacion): 'clima' | 'fotovoltaica' => {
+  const texto = `${e.maquina ?? ''} ${e.motivo ?? ''}`.toLowerCase();
+  return /solar|fotovolt|inversor|placa|panel|string/.test(texto) ? 'fotovoltaica' : 'clima';
+};
+
 type EstadoListado = 'finalizado' | 'en_curso' | 'bloqueado';
 
 const estadoDe = (e: Legalizacion): EstadoListado => {
@@ -32,7 +40,8 @@ const estadoDe = (e: Legalizacion): EstadoListado => {
 
 const ESTADOS: Record<EstadoListado, { etiqueta: string; fila: string; punto: string }> = {
   finalizado: { etiqueta: 'Finalizado', fila: 'bg-green-50', punto: 'bg-green-500' },
-  en_curso: { etiqueta: 'En curso', fila: '', punto: 'bg-slate-300' },
+  // Las iniciadas (en curso) van en gris claro, para que se vean las tres a simple vista (Salva, 7-oct-2026)
+  en_curso: { etiqueta: 'En curso', fila: 'bg-slate-100', punto: 'bg-slate-400' },
   bloqueado: { etiqueta: 'Bloqueada', fila: 'bg-red-50', punto: 'bg-red-400' },
 };
 
@@ -79,7 +88,7 @@ const COLUMNAS: Columna[] = [
 /** Lo que se está filtrando en una columna: un texto libre y/o una lista de valores marcados. */
 type Filtro = { texto: string; valores: string[] };
 
-export function ListadoLegalizaciones() {
+export function ListadoLegalizaciones({ tipoApartado = 'todas' }: { tipoApartado?: TipoInstal } = {}) {
   const qc = useQueryClient();
   const [archivados, setArchivados] = useState(false);
   const [busca, setBusca] = useState('');
@@ -112,6 +121,8 @@ export function ListadoLegalizaciones() {
   const filas = useMemo(() => {
     const t = busca.trim().toLowerCase();
     const pasa = (e: Legalizacion) => {
+      // Solo el tipo del apartado: en Fotovoltaica no salen las obras de clima (Salva, 7-oct-2026)
+      if (tipoApartado !== 'todas' && tipoInstalacion(e) !== tipoApartado) return false;
       if (t) {
         const enAlguna = COLUMNAS.some(c =>
           c.valor(e).toLowerCase().includes(t) || (esFecha(c.clave) && fechaCorta(c.valor(e)).includes(t)));
@@ -133,7 +144,7 @@ export function ListadoLegalizaciones() {
       const x = col.valor(a), y = col.valor(b);
       return orden.asc ? x.localeCompare(y, 'es') : y.localeCompare(x, 'es');
     });
-  }, [data, busca, filtros, orden]);
+  }, [data, busca, filtros, orden, tipoApartado]);
 
   /** Los valores distintos de una columna, con cuántos hay de cada uno (para el desplegable). */
   const valoresDe = (c: Columna): [string, number][] => {
@@ -268,7 +279,7 @@ export function ListadoLegalizaciones() {
             {filas.map(e => {
               const estado = ESTADOS[estadoDe(e)];
               return (
-                <tr key={e.id} className={`${estado.fila} hover:bg-brand/5`}>
+                <tr key={e.id} className={`${estado.fila} hover:brightness-95`}>
                   {COLUMNAS.map(c => (
                     <td
                       key={c.clave}

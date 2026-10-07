@@ -43,6 +43,14 @@ const ESTADOS: Record<string, string> = {
   bloqueado: 'Bloqueada',
 };
 
+/** ¿Es de clima o de fotovoltaica? Igual que en el apartado: mira la máquina y el motivo. */
+type TipoInstal = 'clima' | 'fotovoltaica' | 'todas';
+
+const tipoInstalacion = (e: Legalizacion): 'clima' | 'fotovoltaica' => {
+  const texto = `${e.maquina ?? ''} ${e.motivo ?? ''}`.toLowerCase();
+  return /solar|fotovolt|inversor|placa|panel|string/.test(texto) ? 'fotovoltaica' : 'clima';
+};
+
 /** La marca de la máquina: la primera palabra de su nombre. */
 const marcaDe = (m?: string | null) => (m ?? '').trim().split(/\s+/)[0] ?? '';
 
@@ -68,7 +76,7 @@ const bonito = (v?: string | null) => {
 
 type Periodo = 'semana' | 'mes' | 'año' | 'todo';
 
-export function AuditoriaLegalizaciones() {
+export function AuditoriaLegalizaciones({ tipoApartado = 'todas' }: { tipoApartado?: TipoInstal } = {}) {
   const hoy = iso(new Date());
   const [periodo, setPeriodo] = useState<Periodo>('mes');
   const [fecha, setFecha] = useState(hoy);
@@ -87,7 +95,12 @@ export function AuditoriaLegalizaciones() {
     queryKey: ['legalizaciones-auditoria'],
     queryFn: () => legApi.list({ archivados: '1' }),
   });
-  const todos = (data ?? []) as Legalizacion[];
+  // Solo el tipo del apartado en el que estamos: en Fotovoltaica no salen las obras de clima
+  // (Salva, 7-oct-2026).
+  const todos = useMemo(
+    () => ((data ?? []) as Legalizacion[]).filter((t) => tipoApartado === 'todas' || tipoInstalacion(t) === tipoApartado),
+    [data, tipoApartado],
+  );
 
   const partners = useMemo(() => {
     const enDatos = todos.map((t) => (t.partner ?? '').trim()).filter(Boolean);
