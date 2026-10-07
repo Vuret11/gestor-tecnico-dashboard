@@ -40,21 +40,38 @@ export function EtapasLegalizacion({ tramiteId }: { tramiteId: string }) {
   return (
     <div className="mt-1 space-y-1">
       <div className="flex gap-1">
-        {etapas.map((e) => (
-          <button
-            key={e.etapa}
-            onClick={() => marcar.mutate({ etapa: e.etapa, hecha: !e.hecha })}
-            disabled={marcar.isPending}
-            title={`${e.etiqueta}: ${e.ayuda}${e.hecha ? ' · pulsa para desmarcar' : ''}`}
-            className={`flex-1 px-1.5 py-1 text-[11px] rounded-lg border inline-flex items-center justify-center gap-1 disabled:opacity-50 ${
-              e.hecha
-                ? 'bg-green-50 border-green-300 text-green-700 font-medium'
-                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            {e.hecha ? <Check size={12} /> : <Clock size={12} />} {e.etiqueta}
-          </button>
-        ))}
+        {etapas.map((e, i) => {
+          /**
+           * Las etapas van EN ORDEN (Salva, 7-oct-2026: «no podemos dar al botón subido o finalizado sin
+           * pasar por Inicio»): una etapa solo se puede marcar si la anterior está hecha, y una etapa
+           * hecha solo se puede desmarcar si no hay ninguna posterior hecha. El servidor lo comprueba
+           * igual, así que aquí lo que se hace es no dejar pulsar lo que va a rechazar.
+           */
+          const anteriorHecha = i === 0 || etapas[i - 1].hecha;
+          const hayPosteriorHecha = etapas.slice(i + 1).some((x) => x.hecha);
+          const bloqueado = e.hecha ? hayPosteriorHecha : !anteriorHecha;
+          const motivo = e.hecha
+            ? `Para desmarcar «${e.etiqueta}» desmarca antes «${etapas.slice(i + 1).find((x) => x.hecha)?.etiqueta}»`
+            : `Para marcar «${e.etiqueta}» hay que marcar antes «${etapas[i - 1]?.etiqueta}»`;
+
+          return (
+            <button
+              key={e.etapa}
+              onClick={() => marcar.mutate({ etapa: e.etapa, hecha: !e.hecha })}
+              disabled={marcar.isPending || bloqueado}
+              title={bloqueado ? motivo : `${e.etiqueta}: ${e.ayuda}${e.hecha ? ' · pulsa para desmarcar' : ''}`}
+              className={`flex-1 px-1.5 py-1 text-[11px] rounded-lg border inline-flex items-center justify-center gap-1 disabled:cursor-not-allowed ${
+                e.hecha
+                  ? 'bg-green-50 border-green-300 text-green-700 font-medium'
+                  : bloqueado
+                    ? 'border-dashed border-slate-200 text-slate-300 bg-slate-50'
+                    : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+              } ${marcar.isPending ? 'disabled:opacity-50' : ''}`}
+            >
+              {e.hecha ? <Check size={12} /> : <Clock size={12} />} {e.etiqueta}
+            </button>
+          );
+        })}
       </div>
 
       {/* Cuándo y quién, debajo de cada etapa hecha */}

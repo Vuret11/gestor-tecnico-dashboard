@@ -735,4 +735,10 @@ export interface Legalizacion {
   datos_obra?: Record<string, unknown> | null;
   /** Observaciones del trámite, una por línea y con la fecha delante (petición de Ariel). */
   observaciones?: string | null;
+  /**
+   * Etapas ya hechas del trámite (`inicio`, `subida_portal`, `finalizado`). Lo manda la lista de
+   * instalaciones para que el tablero de etapas pueda pintar las tres columnas sin preguntar ficha a
+   * ficha (Salva, 7-oct-2026).
+   */
+  etapas_hechas?: EtapaTramiteNombre[];
 }

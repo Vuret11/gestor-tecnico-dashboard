@@ -5,6 +5,7 @@ import { ingenieria as api, tareas as tareasApi, legalizaciones as legApi, maqui
 import type { ProyectoIngenieria, TipoProyecto, EstadoProyecto, Tarea, Legalizacion } from '../types';
 import { Plus, Search, X, Pencil, Zap, Wrench, CalendarDays, Euro, Cpu, Check, Trash2, FileText, ChevronRight } from 'lucide-react';
 import { EtapasLegalizacion } from '../components/EtapasLegalizacion';
+import { TableroEtapas } from '../components/TableroEtapas';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import DocumentosTramite from '../components/DocumentosTramite';
@@ -949,6 +950,9 @@ function ApartadoLegalizaciones() {
           </button>
         ))}
       </div>
+
+      {/* Tablero de etapas: las tres etapas arriba, por columnas y arrastrables (Salva, 7-oct-2026) */}
+      <TableroEtapas tramites={visibles} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Barras titulo="Expedientes por estado" datos={porEstado} />
