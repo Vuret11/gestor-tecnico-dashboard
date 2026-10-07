@@ -2,10 +2,9 @@ import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ingenieria as api, tareas as tareasApi, legalizaciones as legApi, maquinasApi } from '../api/endpoints';
-import type { ProyectoIngenieria, TipoProyecto, EstadoProyecto, Tarea, Legalizacion } from '../types';
+import type { ProyectoIngenieria, TipoProyecto, EstadoProyecto, Tarea, Legalizacion, EtapaTramiteNombre } from '../types';
 import { Plus, Search, X, Pencil, Zap, Wrench, CalendarDays, Euro, Cpu, Check, Trash2, FileText, ChevronRight } from 'lucide-react';
 import { EtapasLegalizacion } from '../components/EtapasLegalizacion';
-import { TableroEtapas } from '../components/TableroEtapas';
 import { ListadoLegalizaciones } from '../components/ListadoLegalizaciones';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -944,6 +943,62 @@ function ApartadoLegalizaciones() {
     };
   }, [exps]);
 
+  /**
+   * Las tres etapas del trámite, en orden, y el movimiento de una ficha de una columna a otra. Las
+   * fichas se arrastran (Salva, 7-oct-2026); al soltarlas se marcan las etapas que falten hasta esa
+   * columna y se desmarcan las posteriores, en el MISMO orden que exige el servidor (una etapa necesita
+   * la anterior, y no se desmarca una etapa con otra posterior marcada).
+   */
+  const COLUMNAS_ETAPA: { etapa: EtapaTramiteNombre; titulo: string }[] = [
+    { etapa: 'inicio', titulo: 'Iniciadas' },
+    { etapa: 'subida_portal', titulo: 'Subidas portal' },
+    { etapa: 'finalizado', titulo: 'Finalizadas' },
+  ];
+  const [arrastrando, setArrastrando] = useState<string | null>(null);
+  const [sobreEtapa, setSobreEtapa] = useState<number | null>(null);
+  const [moviendoEtapa, setMoviendoEtapa] = useState<string | null>(null);
+  const [errorEtapa, setErrorEtapa] = useState('');
+
+  const etapaHecha = (t: Legalizacion, etapa: EtapaTramiteNombre) => (t.etapas_hechas ?? []).includes(etapa);
+
+  /** Columna en la que cae una ficha: la última etapa que tenga hecha (sin ninguna, la primera). */
+  const columnaDeEtapa = (t: Legalizacion) => {
+    let col = 0;
+    COLUMNAS_ETAPA.forEach((c, i) => {
+      if (etapaHecha(t, c.etapa)) col = i;
+    });
+    return col;
+  };
+
+  const moverEtapa = async (id: string, destino: number) => {
+    const t = exps.find(x => x.id === id);
+    if (!t || columnaDeEtapa(t) === destino) return;
+    setErrorEtapa('');
+    setMoviendoEtapa(id);
+    try {
+      for (let i = 0; i <= destino; i++) {
+        if (!etapaHecha(t, COLUMNAS_ETAPA[i].etapa)) {
+          await legApi.marcarEtapa(id, COLUMNAS_ETAPA[i].etapa, true);
+        }
+      }
+      for (let i = COLUMNAS_ETAPA.length - 1; i > destino; i--) {
+        if (etapaHecha(t, COLUMNAS_ETAPA[i].etapa)) {
+          await legApi.marcarEtapa(id, COLUMNAS_ETAPA[i].etapa, false);
+        }
+      }
+      await qc.invalidateQueries({ queryKey: ['legalizaciones'] });
+      await qc.invalidateQueries({ queryKey: ['legalizaciones-listado'] });
+    } catch (err: any) {
+      setErrorEtapa(
+        err?.response?.data?.message
+          ? String(err.response.data.message)
+          : `No se ha podido cambiar de etapa «${t.cliente ?? 'esta instalación'}».`,
+      );
+    } finally {
+      setMoviendoEtapa(null);
+    }
+  };
+
   return (
     <>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -987,9 +1042,6 @@ function ApartadoLegalizaciones() {
         ))}
       </div>
 
-      {/* Tablero de etapas: las tres etapas arriba, por columnas y arrastrables (Salva, 7-oct-2026) */}
-      <TableroEtapas tramites={visibles} />
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Barras titulo="Expedientes por estado" datos={porEstado} />
         <Barras titulo="Expedientes por provincia" datos={porProvincia} />
@@ -1021,9 +1073,71 @@ function ApartadoLegalizaciones() {
 
       {isLoading && <p className="text-sm text-slate-400">Cargando expedientes...</p>}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {visibles.map(e => (
-          <div key={e.id} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-2">
+      {/*
+        Las FICHAS van dentro de las columnas de etapa (Salva, 7-oct-2026: «quiero que se elimine y ya
+        las fichas sean las que están en las columnas»). Ya no hay una lista aparte: la ficha entera se
+        arrastra de una columna a otra para cambiar de etapa.
+      */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h3 className="text-sm font-semibold text-slate-800">Etapas de las instalaciones</h3>
+        <p className="text-[11px] text-slate-500">
+          {visibles.length} {visibles.length === 1 ? 'instalación' : 'instalaciones'} · arrastra una ficha a
+          otra columna para cambiar de etapa
+        </p>
+      </div>
+
+      {errorEtapa && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2 flex items-start justify-between gap-3">
+          <span>{errorEtapa}</span>
+          <button onClick={() => setErrorEtapa('')} className="text-red-400 hover:text-red-600">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {isLoading && <p className="text-sm text-slate-400">Cargando expedientes...</p>}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {COLUMNAS_ETAPA.map((col, i) => {
+          const enColumna = visibles.filter(t => columnaDeEtapa(t) === i);
+          return (
+            <div
+              key={col.etapa}
+              onDragOver={ev => {
+                ev.preventDefault();
+                setSobreEtapa(i);
+              }}
+              onDragLeave={() => setSobreEtapa(s => (s === i ? null : s))}
+              onDrop={ev => {
+                ev.preventDefault();
+                const id = ev.dataTransfer.getData('text/plain');
+                setSobreEtapa(null);
+                setArrastrando(null);
+                if (id) void moverEtapa(id, i);
+              }}
+              className={`rounded-xl border p-2 min-h-[140px] transition-colors ${
+                sobreEtapa === i ? 'border-red-300 bg-red-50/40' : 'border-slate-200 bg-slate-50/60'
+              }`}
+            >
+              <div className="flex items-center justify-between px-1 pb-1">
+                <span className="text-xs font-semibold text-slate-700">{col.titulo}</span>
+                <span className="text-[11px] text-slate-500">{enColumna.length}</span>
+              </div>
+              <div className="space-y-2">
+                {enColumna.map(e => (
+                  <div
+                    key={e.id}
+                    draggable
+                    onDragStart={ev => {
+                      ev.dataTransfer.setData('text/plain', e.id);
+                      ev.dataTransfer.effectAllowed = 'move';
+                      setArrastrando(e.id);
+                    }}
+                    onDragEnd={() => setArrastrando(null)}
+                    className={`bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-2 cursor-grab active:cursor-grabbing hover:border-brand/40 ${
+                      arrastrando === e.id ? 'opacity-50' : ''
+                    } ${moviendoEtapa === e.id ? 'opacity-60' : ''}`}
+                  >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs text-slate-400">Expediente {e.id_externo ?? '—'}</p>
@@ -1091,13 +1205,17 @@ function ApartadoLegalizaciones() {
                 Eliminar trámite
               </button>
             )}
-          </div>
-        ))}
-        {!isLoading && visibles.length === 0 && (
-          <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-400">
-            No hay expedientes con esos filtros.
-          </div>
-        )}
+                  </div>
+                ))}
+                {enColumna.length === 0 && (
+                  <div className="text-[11px] text-slate-400 px-1 py-4 text-center border border-dashed border-slate-200 rounded-lg">
+                    {sobreEtapa === i ? 'Suelta aquí' : 'Ninguna'}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* El listado en tabla, al final de la pantalla (Salva, 7-oct-2026: como su hoja) */}
