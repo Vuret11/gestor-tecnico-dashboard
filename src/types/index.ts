@@ -650,6 +650,34 @@ export interface Homologacion {
   observaciones?: string | null;
 }
 
+/** Las tres etapas de una instalación de legalizaciones (pedido de Salva, 7-oct-2026). */
+export type EtapaTramiteNombre = 'inicio' | 'subida_portal' | 'finalizado';
+
+/** Una etapa con su estado actual: cuándo se marcó por última vez y quién. */
+export interface EtapaTramite {
+  etapa: EtapaTramiteNombre;
+  etiqueta: string;
+  ayuda: string;
+  hecha: boolean;
+  fecha: string | null;
+  usuario: string | null;
+}
+
+/** Una fila del registro: cada vez que alguien marcó o desmarcó una etapa. No se borra nunca. */
+export interface FilaRegistroEtapa {
+  etapa: EtapaTramiteNombre;
+  etiqueta: string;
+  hecha: boolean;
+  fecha: string;
+  usuario: string | null;
+}
+
+export interface EtapasTramite {
+  id: string;
+  etapas: EtapaTramite[];
+  registro: FilaRegistroEtapa[];
+}
+
 export interface Legalizacion {
   fecha_inicio?: string | null;
   fecha_fin?: string | null;

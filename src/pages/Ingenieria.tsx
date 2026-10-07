@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ingenieria as api, tareas as tareasApi, legalizaciones as legApi, maquinasApi } from '../api/endpoints';
 import type { ProyectoIngenieria, TipoProyecto, EstadoProyecto, Tarea, Legalizacion } from '../types';
 import { Plus, Search, X, Pencil, Zap, Wrench, CalendarDays, Euro, Cpu, Check, Trash2, FileText, ChevronRight } from 'lucide-react';
+import { EtapasLegalizacion } from '../components/EtapasLegalizacion';
 import DocumentosTramite from '../components/DocumentosTramite';
 import ApartadoHomologaciones from '../components/ApartadoHomologaciones';
 import SeguimientoObras from '../components/SeguimientoObras';
@@ -778,11 +779,23 @@ function ApartadoLegalizaciones() {
   const borrar = useMutation({
     mutationFn: (id: string) => legApi.remove(id),
     onSuccess: () => {
+      setErrorLista('');
       qc.invalidateQueries({ queryKey: ['legalizaciones'] });
       qc.invalidateQueries({ queryKey: ['legalizaciones-resumen'] });
     },
+    /**
+     * Si el servidor no deja archivar (permisos, trámite ya archivado…), tiene que VERSE: antes el
+     * botón no hacía nada y solo se podía decir «no funciona». Los ingenieros (rol `tecnico`) archivan
+     * desde el 7-oct-2026, que lo pidió Salva.
+     */
+    onError: (e: any) => setErrorLista(
+      `${e?.response?.data?.message ?? e?.message ?? 'Error del servidor'}` +
+      (e?.response?.status ? ` (código ${e.response.status})` : ''),
+    ),
   });
   const [busca, setBusca] = useState('');
+  /** Lo que ha dicho el servidor al intentar archivar (para no fallar en silencio). */
+  const [errorLista, setErrorLista] = useState('');
   // Ficha de documentos del trámite (2-oct-2026): ver, descargar y regenerar los 6 documentos
   const [docsDe, setDocsDe] = useState<Legalizacion | null>(null);
   /**
@@ -950,6 +963,15 @@ function ApartadoLegalizaciones() {
         </select>
       </div>
 
+      {errorLista && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start justify-between gap-3">
+          <span>No se ha podido archivar el trámite: {errorLista}</span>
+          <button onClick={() => setErrorLista('')} className="text-red-400 hover:text-red-600">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {isLoading && <p className="text-sm text-slate-400">Cargando expedientes...</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -993,6 +1015,8 @@ function ApartadoLegalizaciones() {
                 📝 {ultimaObservacion(e)}
               </p>
             )}
+            {/* Las tres etapas: Inicio, Subida Portal y Finalizado (con su registro) */}
+            <EtapasLegalizacion tramiteId={e.id} />
             <button
               onClick={() => setDocsDe(e)}
               className="mt-1 w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-1.5">

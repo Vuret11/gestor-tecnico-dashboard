@@ -1,5 +1,5 @@
 import api from './client';
-import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo, InventarioArticulo, VisitaArticulo, Almacen, ProyectoIngenieria , Tarea, Legalizacion, Homologacion, ResumenObras, EstadoFasesObra, FichaObra, FaseObra, HitoObra, NotaObra, Retencion, MedicionDesviacion, DocumentoObra} from '../types';
+import type { AuthResponse, User, Cliente, Instalacion, InstalacionResumen, Visita, Informe, Incidencia, ChecklistPlantilla, VisitaChecklist, Foto, PlanProvincia, PlanTecnico, PlanCliente, PlanObra, PlanAsignacion, RepoCarpeta, RepoArchivo, InventarioArticulo, VisitaArticulo, Almacen, ProyectoIngenieria , Tarea, Legalizacion, Homologacion, ResumenObras, EstadoFasesObra, FichaObra, FaseObra, HitoObra, NotaObra, Retencion, MedicionDesviacion, DocumentoObra, EtapasTramite, EtapaTramiteNombre} from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
@@ -85,6 +85,11 @@ export const legalizaciones = {
   create: (data: Partial<Legalizacion>) => api.post<Legalizacion>('/legalizaciones', data).then(r => r.data),
   update: (id: string, data: Partial<Legalizacion>) => api.patch<Legalizacion>(`/legalizaciones/${id}`, data).then(r => r.data),
   remove: (id: string) => api.delete(`/legalizaciones/${id}`),
+  /** Las tres etapas del trámite (Inicio, Subida Portal y Finalizado) con su estado y su registro. */
+  etapas: (id: string) => api.get<EtapasTramite>(`/legalizaciones/${id}/etapas`).then(r => r.data),
+  /** Marca la etapa (`hecha: false` la desmarca). Cada pulsación queda registrada con quién y cuándo. */
+  marcarEtapa: (id: string, etapa: EtapaTramiteNombre, hecha = true) =>
+    api.post<EtapasTramite>(`/legalizaciones/${id}/etapas/${etapa}`, { hecha }).then(r => r.data),
 };
 
 /**
