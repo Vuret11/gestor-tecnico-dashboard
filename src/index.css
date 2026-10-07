@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 @theme {
+  /* La letra del departamento: Plex Sans para el texto y Plex Mono para números, fechas e importes.
+     Antes el cuerpo iba con system-ui y el panel parecía una plantilla. */
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-brand:     #e7332f;
   --color-brand-dark: #c42a27;
   --color-brand-light: #fdf2f2;
@@ -13,9 +17,9 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #efebe1;
+  color: #1b2420;
 }
 
 #root {

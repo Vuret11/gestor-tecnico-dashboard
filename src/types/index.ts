@@ -43,6 +43,12 @@ export interface ProyectoIngenieria {
   fechaEntregaEstimada?: string;
   direccion?: string;
   provincia?: string;
+  /** Número de obra que se teclea en la ficha de la obra (lo pone el departamento a mano). */
+  num_obra?: string;
+  /** Los 9 estados del registro de obras (los pinta el cuadro de mando y el informe en PDF). */
+  estado_obra?: string | null;
+  /** Avance en % de la obra. */
+  progreso?: number | null;
   notas?: string;
   disciplinas?: string[];
   responsables?: string[];
@@ -50,8 +56,135 @@ export interface ProyectoIngenieria {
   jefe_obra_contacto?: string;
   tecnico_id?: string;
   tecnico?: User;
+  // ── Importes y márgenes: la parte de dinero de la obra ──
+  /** Margen previsto (%) y margen real (%): vacíos hasta tener los costes de la obra. */
+  margen_previsto?: number | string | null;
+  margen_real?: number | string | null;
+  /** Importe facturado al cliente (€). */
+  importe_facturado?: number | string | null;
+  /** Retención de garantía: 'pendiente' | 'liberada', con su fecha e importe (€). */
+  retencion_estado?: string | null;
+  retencion_fecha?: string | null;
+  retencion_importe?: number | string | null;
+  /** Cliente del registro de clientes (la obra guarda además el nombre en texto). */
+  cliente_id?: string | null;
   activo: boolean;
   createdAt: string;
+}
+
+// ── Seguimiento de obras por cliente (fases, retenciones, mediciones y documentos) ──
+
+/** Las 7 fases de una obra, en orden. La fase actual es la primera sin fecha_fin_real. */
+export const FASES_OBRA: { slug: string; nombre: string }[] = [
+  { slug: 'documentacion_inicio', nombre: 'Documentación inicio' },
+  { slug: 'normativa', nombre: 'Normativa' },
+  { slug: 'homologaciones', nombre: 'Homologaciones' },
+  { slug: 'inicio_obra', nombre: 'Inicio obra' },
+  { slug: 'documentacion_asbuilt', nombre: 'Documentación as-built' },
+  { slug: 'legalizacion', nombre: 'Legalización' },
+  { slug: 'finalizacion_obra', nombre: 'Finalización obra' },
+];
+
+export interface FaseObra {
+  id: string;
+  obra_id: string;
+  fase: string;
+  orden: number;
+  fecha_inicio_prevista?: string | null;
+  fecha_fin_prevista?: string | null;
+  fecha_inicio_real?: string | null;
+  fecha_fin_real?: string | null;
+}
+
+export interface Retencion {
+  id: string;
+  obra_id: string;
+  importe?: number | string | null;
+  /** '6_meses' o '1_ano'. */
+  plazo?: string | null;
+  fecha_vencimiento?: string | null;
+  /** 'pendiente' o 'liberada'. */
+  estado: string;
+  fecha_liberacion?: string | null;
+}
+
+export interface MedicionDesviacion {
+  id: string;
+  obra_id: string;
+  partida?: string | null;
+  unidad?: string | null;
+  cantidad_excel?: number | string | null;
+  cantidad_plano?: number | string | null;
+  diferencia_pct?: number | string | null;
+  impacto_eur?: number | string | null;
+}
+
+export interface DocumentoObra {
+  id: string;
+  obra_id: string;
+  /** XLSX, PDF, DWG u OTRO. */
+  tipo: string;
+  nombre: string;
+  ruta?: string | null;
+  fichero?: string | null;
+  bytes?: number | null;
+  fecha_subida: string;
+}
+
+export interface HitoObra {
+  id: string;
+  obra_id: string;
+  nombre: string;
+  fecha?: string | null;
+  /** true = ya conseguido (rombo relleno en el Gantt). */
+  hecho: boolean;
+}
+
+export interface NotaObra {
+  id: string;
+  obra_id: string;
+  texto: string;
+  autor?: string | null;
+  autor_id?: string | null;
+  createdAt: string;
+}
+
+/** En qué punto está la obra: finalizada y cuál es su fase actual. */
+export interface EstadoFasesObra {
+  finalizada: boolean;
+  fase_actual: string | null;
+  fases_hechas: number;
+  /** Fecha real de fin de la fase «Finalización obra» (la que manda la obra a Finalizadas). */
+  fecha_finalizacion?: string | null;
+  /** Las 7 fases en orden, para poder marcarlas desde la tabla (puntos de la columna FASES). */
+  fases?: {
+    id: string;
+    fase: string;
+    orden: number;
+    fecha_inicio_real: string | null;
+    fecha_fin_real: string | null;
+  }[];
+}
+
+export interface FichaObra extends Omit<EstadoFasesObra, 'fases'> {
+  obra: ProyectoIngenieria;
+  fases: FaseObra[];
+  hitos: HitoObra[];
+  retenciones: Retencion[];
+  mediciones: MedicionDesviacion[];
+  documentos: DocumentoObra[];
+  /** El bloc de notas de la obra, la más reciente primero. */
+  notas: NotaObra[];
+}
+
+/** Los cuatro indicadores de la cabecera. null = todavía no hay datos (se pinta «—»). */
+export interface ResumenObras {
+  clientes_activos: number;
+  obras_activas: number;
+  margen_real_medio: number | null;
+  desviacion_total: number | null;
+  obras_finalizadas: number;
+  obras_totales: number;
 }
 
 export type TipoInstalacion = 'fv' | 'rite' | 'otro';
@@ -359,14 +492,163 @@ export interface Tarea {
   disciplina?: string;
   responsables?: string[];
   fecha_limite?: string;
+  /**
+   * El día en que hay que EMPEZAR la tarea. Se elige al asignarla («Inicio»), no es `iniciada_en`
+   * (esa se fecha sola cuando la tarea pasa a «en curso»). Lo pidió Salva el 7-oct-2026.
+   */
+  fecha_inicio?: string | null;
+  /** Se fechan solas al cambiar el estado (no se teclean). */
+  iniciada_en?: string | null;
   completada_en?: string;
   proyecto_id?: string;
   operario_id?: string;
+  /** La persona a la que está asignada (el API la trae entera). */
+  operario?: User;
   createdAt: string;
 }
 
 
 export type EstadoLegalizacion = 'bloqueado' | 'con_avisos' | 'listo_presentar' | 'presentado' | 'inscrito';
+
+// ── Homologaciones (segundo apartado de Ingeniería, junto a Obras y Legalizaciones) ──────────
+export type EstadoHomologacion =
+  | 'recibida' | 'en_revision' | 'borrador_emitido' | 'con_incidencias' | 'revisada' | 'cerrada';
+
+/** Los cinco tipos de instalación del apartado, cada uno con su base normativa. */
+export type InstalacionHomologacion =
+  | 'clima' | 'fontaneria' | 'pci' | 'teleco' | 'electricidad';
+
+/** Base normativa de una instalación (la que se cita en el informe: no se inventan normas). */
+export interface NormaHomologacion { norma: string; referencia: string; nota: string; }
+
+/**
+ * Un punto comprobado contra la norma, con su veredicto. `estado` es el resultado de contrastar lo
+ * que declara la documentación con el mínimo del artículo: 'cumple', 'no_cumple' (va en rojo en el
+ * panel y en los PDF) o 'sin_datos' (no se dictamina porque el dato no aparece).
+ */
+export interface VerificacionNorma {
+  id: string;
+  que: string;
+  articulo: string;
+  fuente: string;
+  estado: 'cumple' | 'no_cumple' | 'sin_datos';
+  gravedad: 'alta' | 'media' | 'baja' | null;
+  evidencia: string;
+  detalle: string;
+  valores?: Record<string, unknown>;
+}
+
+/** Una partida del presupuesto, ya clasificada por instalación y buscada en los planos. */
+export interface PartidaHomologacion {
+  codigo: string;
+  unidad: string;
+  resumen: string;
+  cantidad: number;
+  precio: number;
+  importe: number;
+  /** Capítulo del presupuesto del que sale (03, 15, 16, 17, 18, 19, 21) e instalación a la que va. */
+  capitulo: string;
+  instalacion: string;
+  /** 'localizada' (citada en el plano) · 'a_verificar' (no se ha encontrado: lo mira el técnico). */
+  estado: string;
+  /** Las marcas/modelos/secciones con las que se encontró en el plano. */
+  coincidencias: string[];
+  /** Hojas del PDF de planos donde aparece. */
+  hojas: number[];
+  /**
+   * Si queda «a verificar»: qué hay que comprobar exactamente y con qué punto de la normativa
+   * (p. ej. «Red de tierra: picas, conductor y caja de seccionamiento · REBT ITC-BT-18»).
+   */
+  verificacion?: { requisito: string; norma: string; donde: string; alcance?: boolean };
+}
+
+/** Resultado de UNA instalación: mediciones vs planos y cumplimiento normativo (borrador). */
+export interface BloqueHomologacion {
+  tipo: string;
+  normativa: NormaHomologacion[];
+  resumen: string;
+  mediciones: {
+    partidas: PartidaHomologacion[];
+    totales: {
+      partidas: number; importe: number; localizadas: number; a_verificar: number;
+      importe_a_verificar: number;
+    };
+    capitulos: string[];
+    aviso: string;
+  };
+  cumplimiento: {
+    estado: string;
+    requisitos: (NormaHomologacion & { estado: string })[];
+    comprobaciones: { clave: string; que: string; norma?: string; localizada: boolean; estado: string; paginas: number[] }[];
+    /** El veredicto de cada punto comprobado contra la norma: cumple / no cumple / sin datos. */
+    verificaciones?: VerificacionNorma[];
+    resumen?: { verificadas: number; cumple: number; no_cumple: number; sin_datos: number };
+    incumplimientos: string[];
+    dudas: string[];
+    observaciones: string[];
+    aviso: string;
+  };
+}
+
+/** Resultado completo del análisis de la documentación de un trámite. Es un BORRADOR. */
+export interface ResultadoHomologacion {
+  generado: string;
+  obra?: string | null;
+  documentos: { nombre: string; tipo: string; bytes: number; subido?: string | null }[];
+  /** Hojas de planos leídas del PDF. */
+  hojas_de_plano: number;
+  /** Lo que no se ha podido hacer y por qué (sin documentación, PDF ilegible, DWG sin convertir…). */
+  avisos: string[];
+  instalaciones: BloqueHomologacion[];
+  totales: { partidas: number; importe: number; localizadas: number; a_verificar: number; con_cantidad: number };
+  sello: string;
+}
+
+export interface Homologacion {
+  id: string;
+  num_obra?: string | null;
+  cliente?: string | null;
+  partner?: string | null;
+  nif?: string | null;
+  direccion?: string | null;
+  cp?: string | null;
+  municipio?: string | null;
+  provincia?: string | null;
+  /** Una obra se clasifica en una o varias de las cinco instalaciones. */
+  instalaciones: string[] | null;
+  /** Obra del registro de Ingeniería de la que cuelga el trámite. */
+  proyecto_id?: string | null;
+  proyecto_nombre?: string | null;
+  estado: EstadoHomologacion;
+  creado_por?: string | null;
+  responsable?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+  /** Documentación de la obra: Excel de mediciones, PDF de planos/memorias y DWG. */
+  archivos?: {
+    nombre: string; tipo: string; bytes?: number; subido?: string;
+    fichero?: string; url?: string;
+  }[] | null;
+  /** Los dos informes del apartado (cumplimiento normativo y mediciones vs planos). */
+  informes?: {
+    cumplimiento?: { generado: string; archivo?: string } | null;
+    mediciones?: { generado: string; archivo?: string } | null;
+  } | null;
+  /** Resultado del análisis de la documentación, un bloque por instalación (es un borrador). */
+  resultados?: ResultadoHomologacion | null;
+  /** Cuándo se lanzó el análisis (nulo = todavía no se ha analizado la documentación). */
+  analizado_en?: string | null;
+  n_incumplimientos: number;
+  n_dudas: number;
+  n_observaciones: number;
+  impacto_favor?: number | null;
+  impacto_contra?: number | null;
+  n_no_asociados: number;
+  motivo?: string | null;
+  parado: boolean;
+  notas?: string | null;
+  observaciones?: string | null;
+}
 
 export interface Legalizacion {
   fecha_inicio?: string | null;
@@ -404,4 +686,25 @@ export interface Legalizacion {
   parado: boolean;
   notas?: string;
   responsable?: string;
+  // Datos que necesitan el formulario de edición y los documentos (2026-10-06).
+  email?: string | null;
+  telefono?: string | null;
+  tipo_via?: string | null;
+  numero?: string | null;
+  bloque?: string | null;
+  portal?: string | null;
+  escalera?: string | null;
+  piso?: string | null;
+  puerta?: string | null;
+  oca_cif?: string | null;
+  tipo_instalacion?: string | null;
+  tipo_energia?: string | null;
+  tipo_uso?: string | null;
+  viviendas?: number | null;
+  acs_volumen_acumulador_l?: number | null;
+  maquina_id?: number | null;
+  maquinas_instalacion?: { maquina_id: number; unidades: number }[] | null;
+  datos_obra?: Record<string, unknown> | null;
+  /** Observaciones del trámite, una por línea y con la fecha delante (petición de Ariel). */
+  observaciones?: string | null;
 }

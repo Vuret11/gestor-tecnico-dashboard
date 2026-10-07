@@ -46,7 +46,8 @@ export default function App() {
               <Route path="/planificacion" element={<Planificacion />} />
               <Route path="/inventario" element={<Inventario />} />
               <Route path="/repositorio" element={<Repositorio />} />
-              <Route path="/ingenieria" element={<Ingenieria />} />
+              <Route path="/ingenieria" element={<Navigate to="/ingenieria/obras" replace />} />
+              <Route path="/ingenieria/:apartado" element={<Ingenieria />} />
               <Route path="/permisos" element={<Permisos />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
