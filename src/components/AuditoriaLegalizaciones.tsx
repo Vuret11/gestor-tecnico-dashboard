@@ -163,12 +163,14 @@ export function AuditoriaLegalizaciones() {
     };
   }, [filas]);
 
+  // Orden de las columnas que ha pedido Salva el 7-oct-2026: Expediente · Partner · Cliente · Provincia
+  // · Municipio y el resto como estaba.
   const fila = (t: Legalizacion) => [
     t.id_externo ?? '',
-    t.cliente ?? '',
-    t.municipio ?? '',
-    t.provincia ?? '',
     (t.partner ?? '').trim(),
+    t.cliente ?? '',
+    t.provincia ?? '',
+    t.municipio ?? '',
     t.tipo_instalacion ?? '',
     USOS[t.tipo_uso ?? ''] ?? t.tipo_uso ?? '',
     ESTADOS[estadoDe(t)],
@@ -181,7 +183,7 @@ export function AuditoriaLegalizaciones() {
   ];
 
   const cabeza = [
-    'Expediente', 'Cliente', 'Municipio', 'Provincia', 'Partner', 'Tipo instalación', 'Tipo de uso',
+    'Expediente', 'Partner', 'Cliente', 'Provincia', 'Municipio', 'Tipo instalación', 'Tipo de uso',
     'Estado', 'Inicio', 'Fin', 'Etapas', 'Facturada', 'Máquina', 'Nº obra',
   ];
 
