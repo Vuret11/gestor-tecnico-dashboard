@@ -76,7 +76,7 @@ export const tareas = {
 };
 
 export const legalizaciones = {
-  list: (filtros?: { estado?: string }) =>
+  list: (filtros?: { estado?: string; responsable?: string; archivados?: string }) =>
     api.get<Legalizacion[]>('/legalizaciones', { params: filtros ?? {} }).then(r => r.data),
   resumen: () => api.get<{
     total: number; porEstado: Record<string, number>; porProvincia: Record<string, number>;

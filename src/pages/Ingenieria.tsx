@@ -6,6 +6,7 @@ import type { ProyectoIngenieria, TipoProyecto, EstadoProyecto, Tarea, Legalizac
 import { Plus, Search, X, Pencil, Zap, Wrench, CalendarDays, Euro, Cpu, Check, Trash2, FileText, ChevronRight } from 'lucide-react';
 import { EtapasLegalizacion } from '../components/EtapasLegalizacion';
 import { TableroEtapas } from '../components/TableroEtapas';
+import { ListadoLegalizaciones } from '../components/ListadoLegalizaciones';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import DocumentosTramite from '../components/DocumentosTramite';
@@ -916,9 +917,39 @@ function ApartadoLegalizaciones() {
     return t.includes(busca.toLowerCase());
   });
 
+  /**
+   * Cuántas legalizaciones han ENTRADO en el mes en que estamos, y de qué tipo. Lo pidió Salva el
+   * 7-oct-2026: «quiero que arriba en el dashboard salga una cuenta de legalizaciones del mismo mes y
+   * tipo». Se cuenta por la fecha de inicio del expediente (la que trae del CRM y la que se ve en su
+   * ficha), y el tipo con el MISMO criterio que las pestañas de arriba, para que los números cuadren.
+   *
+   * Se compara el texto de la fecha («2026-10») y no la fecha convertida, porque `new Date('2026-10-01')`
+   * es medianoche UTC y en verano español un día uno se colaría en el mes anterior.
+   */
+  const mesDeHoy = useMemo(() => {
+    const ahora = new Date();
+    const clave = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+    const delMes = exps.filter(e => (e.fecha_inicio ?? '').slice(0, 7) === clave);
+    const clima = delMes.filter(e => tipoInstalacion(e) === 'clima').length;
+    return {
+      etiqueta: ahora.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+      total: delMes.length,
+      clima,
+      fotovoltaica: delMes.length - clima,
+    };
+  }, [exps]);
+
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-white rounded-xl border border-brand/30 bg-brand/5 p-4">
+          <p className="text-xs text-slate-500">Legalizaciones de este mes</p>
+          <p className="text-2xl font-semibold text-slate-900">{mesDeHoy.total}</p>
+          <p className="text-[11px] text-slate-500 capitalize">{mesDeHoy.etiqueta}</p>
+          <p className="text-[11px] text-slate-500">
+            Clima {mesDeHoy.clima} · Fotovoltaica {mesDeHoy.fotovoltaica}
+          </p>
+        </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <p className="text-xs text-slate-500">Expedientes</p>
           <p className="text-2xl font-semibold text-slate-900">{resumen?.total ?? 0}</p>
@@ -1063,6 +1094,10 @@ function ApartadoLegalizaciones() {
           </div>
         )}
       </div>
+
+      {/* El listado en tabla, al final de la pantalla (Salva, 7-oct-2026: como su hoja) */}
+      <ListadoLegalizaciones />
+
       {docsDe && <DocumentosTramite tramite={docsDe} onClose={() => setDocsDe(null)} />}
       {nuevoAbierto && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
