@@ -1183,12 +1183,8 @@ function ApartadoLegalizaciones() {
               <div className="min-w-0">
                 <p className="text-xs text-slate-400">Expediente {e.id_externo ?? '—'}</p>
                 <p className="font-semibold text-slate-900 truncate">
-                  {/* El partner, delante del nombre (Salva, 7-oct-2026) */}
-                  {e.partner && (
-                    <span className="text-[10px] font-medium text-brand border border-brand/30 bg-brand/5 rounded px-1 py-0.5 mr-1 align-middle">
-                      {(e.partner ?? '').trim()}
-                    </span>
-                  )}
+                  {/* El partner, delante del nombre y con la letra del nombre (Salva, 7-oct-2026) */}
+                  {e.partner && <span className="text-brand mr-1">{(e.partner ?? '').trim()}</span>}
                   {e.cliente || 'Sin cliente'}
                 </p>
                 <p className="text-xs text-slate-500 truncate">
